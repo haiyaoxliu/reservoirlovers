@@ -5,6 +5,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 type Units = "km" | "mi";
 type Theme = "dark" | "light";
 type MapWindow = "normal" | "wide" | "all";
+export type LeaderboardRange = "week" | "month" | "year" | "all";
 
 /** Individually toggleable pieces of secondary chrome. All default to shown. */
 export interface DetailPrefs {
@@ -40,19 +41,24 @@ const SettingsContext = createContext<{
   theme: Theme;
   /** How many timeline date columns the map window spans: normal 4, wide 8. */
   mapWindow: MapWindow;
+  /** Time range the leaderboard scores cover. */
+  range: LeaderboardRange;
   prefs: DetailPrefs;
   setUnits: (u: Units) => void;
   setTheme: (t: Theme) => void;
   setMapWindow: (w: MapWindow) => void;
+  setRange: (r: LeaderboardRange) => void;
   setPref: (key: keyof DetailPrefs, value: boolean) => void;
 }>({
   units: "km",
   theme: "dark",
   mapWindow: "normal",
+  range: "all",
   prefs: DEFAULT_PREFS,
   setUnits: () => {},
   setTheme: () => {},
   setMapWindow: () => {},
+  setRange: () => {},
   setPref: () => {},
 });
 
@@ -62,6 +68,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [units, setUnitsState] = useState<Units>("km");
   const [theme, setThemeState] = useState<Theme>("dark");
   const [mapWindow, setMapWindowState] = useState<MapWindow>("normal");
+  const [range, setRangeState] = useState<LeaderboardRange>("all");
   const [prefs, setPrefsState] = useState<DetailPrefs>(DEFAULT_PREFS);
 
   // localStorage is read after mount so the server render hydrates cleanly;
@@ -72,6 +79,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       if (localStorage.getItem("rl-theme") === "light") setThemeState("light");
       const win = localStorage.getItem("rl-map-window");
       if (win === "wide" || win === "all") setMapWindowState(win);
+      const rng = localStorage.getItem("rl-range");
+      if (rng === "week" || rng === "month" || rng === "year") setRangeState(rng);
       const stored = JSON.parse(localStorage.getItem("rl-detail") ?? "{}");
       setPrefsState({ ...DEFAULT_PREFS, ...stored });
     } catch {}
@@ -96,6 +105,12 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem("rl-map-window", w);
     } catch {}
   };
+  const setRange = (r: LeaderboardRange) => {
+    setRangeState(r);
+    try {
+      localStorage.setItem("rl-range", r);
+    } catch {}
+  };
   const setPref = (key: keyof DetailPrefs, value: boolean) => {
     setPrefsState((prev) => {
       const next = { ...prev, [key]: value };
@@ -111,7 +126,18 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <SettingsContext.Provider
-      value={{ units, theme, mapWindow, prefs, setUnits, setTheme, setMapWindow, setPref }}
+      value={{
+        units,
+        theme,
+        mapWindow,
+        range,
+        prefs,
+        setUnits,
+        setTheme,
+        setMapWindow,
+        setRange,
+        setPref,
+      }}
     >
       {children}
     </SettingsContext.Provider>
@@ -374,8 +400,18 @@ const DETAIL_TOGGLES: { key: keyof DetailPrefs; label: string }[] = [
 export function HeaderActions({ isAdmin = false }: { isAdmin?: boolean }) {
   const [openSettings, setOpenSettings] = useState(false);
   const [openDetail, setOpenDetail] = useState(false);
-  const { units, theme, mapWindow, prefs, setUnits, setTheme, setMapWindow, setPref } =
-    useSettings();
+  const {
+    units,
+    theme,
+    mapWindow,
+    range,
+    prefs,
+    setUnits,
+    setTheme,
+    setMapWindow,
+    setRange,
+    setPref,
+  } = useSettings();
 
   return (
     <div style={{ display: "flex", gap: 8 }}>
@@ -470,11 +506,23 @@ export function HeaderActions({ isAdmin = false }: { isAdmin?: boolean }) {
             <Segmented
               value={mapWindow}
               options={[
-                { v: "normal", label: "Normal" },
-                { v: "wide", label: "Wide" },
+                { v: "normal", label: "4" },
+                { v: "wide", label: "8" },
                 { v: "all", label: "All" },
               ]}
               onChange={setMapWindow}
+            />
+          </Row>
+          <Row label="Leaderboard">
+            <Segmented
+              value={range}
+              options={[
+                { v: "week", label: "W" },
+                { v: "month", label: "M" },
+                { v: "year", label: "Y" },
+                { v: "all", label: "All" },
+              ]}
+              onChange={setRange}
             />
           </Row>
         </Modal>
