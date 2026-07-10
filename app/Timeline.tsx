@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import type { TimelineEvent } from "@/lib/queries";
 import { formatDuration } from "@/lib/queries";
+import { ExternalLinkIcon } from "./ExternalLinkIcon";
 
 export interface TimelineMember {
   userId: number;
@@ -199,14 +200,19 @@ export function Timeline({
                     target="_blank"
                     rel="noreferrer"
                     style={{
+                      flex: 1,
+                      minWidth: 0,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
                       color: "inherit",
                       fontSize: 13,
-                      whiteSpace: "nowrap",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
                     }}
                   >
-                    {m.displayName}
+                    <span style={{ flex: 1, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {m.displayName}
+                    </span>
+                    <ExternalLinkIcon size={11} />
                   </a>
                 </div>
 
@@ -268,9 +274,10 @@ export function Timeline({
                   href={stravaProfileUrl(athleteOf(selected.userId)!)}
                   target="_blank"
                   rel="noreferrer"
-                  style={{ color: "inherit" }}
+                  style={{ color: "inherit", display: "inline-flex", alignItems: "center", gap: 6 }}
                 >
                   {selected.displayName}
+                  <ExternalLinkIcon size={11} />
                 </a>
               ) : (
                 selected.displayName

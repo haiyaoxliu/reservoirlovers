@@ -4,6 +4,7 @@ import { getLeaderboard, getTimeline, formatDuration } from "@/lib/queries";
 import { colorFor } from "@/lib/colors";
 import { Timeline, type TimelineMember } from "./Timeline";
 import { Avatar } from "./Avatar";
+import { ExternalLinkIcon } from "./ExternalLinkIcon";
 
 export const dynamic = "force-dynamic";
 
@@ -75,9 +76,22 @@ export default async function HomePage() {
                   href={`https://www.strava.com/athletes/${r.stravaAthleteId}`}
                   target="_blank"
                   rel="noreferrer"
-                  style={{ flex: 1, color: "inherit", fontWeight: 500, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    color: "inherit",
+                    fontWeight: 500,
+                  }}
                 >
-                  {r.displayName}
+                  {/* Name shrinks/truncates; the icon stays pinned at the end
+                      of the column so it lines up across rows. */}
+                  <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {r.displayName}
+                  </span>
+                  <ExternalLinkIcon />
                 </a>
                 <div style={{ textAlign: "right" }}>
                   <div style={{ fontVariantNumeric: "tabular-nums", fontSize: 18, fontWeight: 700 }}>
