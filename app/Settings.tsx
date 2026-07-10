@@ -312,6 +312,44 @@ function Segmented<T extends string>({
   );
 }
 
+/** Full-height tab buttons for section header stripes. */
+export function HeaderTabs<T extends string>({
+  value,
+  options,
+  onChange,
+}: {
+  value: T;
+  options: { v: T; label: string }[];
+  onChange: (v: T) => void;
+}) {
+  return (
+    <span style={{ display: "flex", alignSelf: "stretch" }}>
+      {options.map((o) => (
+        <button
+          key={o.v}
+          onClick={() => onChange(o.v)}
+          aria-pressed={value === o.v}
+          style={{
+            padding: "0 10px",
+            border: "none",
+            borderLeft: "1px solid var(--border)",
+            background: value === o.v ? "var(--mask)" : "transparent",
+            color: value === o.v ? "var(--text)" : "var(--muted)",
+            fontSize: 11,
+            fontWeight: value === o.v ? 600 : 400,
+            letterSpacing: 1,
+            textTransform: "uppercase",
+            cursor: "pointer",
+          }}
+        >
+          {o.label}
+        </button>
+      ))}
+      <span style={{ borderLeft: "1px solid var(--border)" }} />
+    </span>
+  );
+}
+
 function Modal({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
   return (
     <div
@@ -400,18 +438,7 @@ const DETAIL_TOGGLES: { key: keyof DetailPrefs; label: string }[] = [
 export function HeaderActions({ isAdmin = false }: { isAdmin?: boolean }) {
   const [openSettings, setOpenSettings] = useState(false);
   const [openDetail, setOpenDetail] = useState(false);
-  const {
-    units,
-    theme,
-    mapWindow,
-    range,
-    prefs,
-    setUnits,
-    setTheme,
-    setMapWindow,
-    setRange,
-    setPref,
-  } = useSettings();
+  const { units, theme, prefs, setUnits, setTheme, setPref } = useSettings();
 
   return (
     <div style={{ display: "flex", gap: 8 }}>
@@ -502,29 +529,7 @@ export function HeaderActions({ isAdmin = false }: { isAdmin?: boolean }) {
               onChange={setTheme}
             />
           </Row>
-          <Row label="Map window">
-            <Segmented
-              value={mapWindow}
-              options={[
-                { v: "normal", label: "4" },
-                { v: "wide", label: "8" },
-                { v: "all", label: "All" },
-              ]}
-              onChange={setMapWindow}
-            />
-          </Row>
-          <Row label="Leaderboard">
-            <Segmented
-              value={range}
-              options={[
-                { v: "week", label: "W" },
-                { v: "month", label: "M" },
-                { v: "year", label: "Y" },
-                { v: "all", label: "All" },
-              ]}
-              onChange={setRange}
-            />
-          </Row>
+          {/* Map window and leaderboard range moved to their section headers */}
         </Modal>
       ) : null}
     </div>

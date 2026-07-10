@@ -5,7 +5,14 @@ import type { TimelineEvent } from "@/lib/queries";
 import { formatDuration } from "@/lib/queries";
 import type { TimelineMember } from "./Timeline";
 import { Avatar } from "./Avatar";
-import { DetailOnly, Distance, DistanceUnit, useSettings, type LeaderboardRange } from "./Settings";
+import {
+  DetailOnly,
+  Distance,
+  DistanceUnit,
+  HeaderTabs,
+  useSettings,
+  type LeaderboardRange,
+} from "./Settings";
 import { LeaderboardRow, MemberName } from "./LeaderboardRow";
 import canonicalJson from "@/loop/canonical-loop.json";
 
@@ -34,7 +41,7 @@ export function Leaderboard({
   members: TimelineMember[];
   events: TimelineEvent[];
 }) {
-  const { range } = useSettings();
+  const { range, setRange } = useSettings();
 
   const rows = useMemo(() => {
     const span = RANGE_MS[range];
@@ -81,25 +88,39 @@ export function Leaderboard({
               letterSpacing: 1,
               background: "var(--panel)",
               borderTop: "1px solid var(--border)",
-              padding: "6px 16px",
+              padding: 0,
               display: "flex",
-              alignItems: "baseline",
+              alignItems: "stretch",
               justifyContent: "space-between",
             }}
           >
-            <span>
-              Leaderboard
-              {range !== "all" ? (
-                <span style={{ fontWeight: 400 }}>
-                  {" "}
-                  · past {range}
-                </span>
-              ) : null}
+            <span style={{ display: "flex", alignItems: "stretch" }}>
+              <span style={{ display: "flex", alignItems: "center", padding: "6px 12px 6px 16px" }}>
+                Leaderboard
+              </span>
+              {/* Range tabs: scores cover the past week / month / year / all */}
+              <HeaderTabs
+                value={range}
+                options={[
+                  { v: "week", label: "W" },
+                  { v: "month", label: "M" },
+                  { v: "year", label: "Y" },
+                  { v: "all", label: "All" },
+                ]}
+                onChange={setRange}
+              />
             </span>
             {/* Column headers, matching the row column widths below; they
                 hide together with the stat columns. */}
             <DetailOnly pref="statColumns">
-              <span style={{ display: "flex", alignItems: "baseline" }}>
+              <span
+                style={{
+                  display: "flex",
+                  alignItems: "baseline",
+                  alignSelf: "center",
+                  paddingRight: 16,
+                }}
+              >
                 <span style={{ width: 66, textAlign: "right" }}>PR</span>
                 <span style={{ width: 62, textAlign: "right" }}>
                   <DistanceUnit />

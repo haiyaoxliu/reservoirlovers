@@ -6,7 +6,7 @@ import { formatDuration } from "@/lib/queries";
 import { Timeline, TIMELINE_RAIL_W, type TimelineMember } from "./Timeline";
 import { Avatar } from "./Avatar";
 import { ExternalLinkIcon } from "./ExternalLinkIcon";
-import { DetailOnly, Distance, useSettings } from "./Settings";
+import { DetailOnly, Distance, HeaderTabs, useSettings } from "./Settings";
 import canonicalJson from "@/loop/canonical-loop.json";
 
 const MAP_PAD_M = 30;
@@ -79,7 +79,7 @@ export function Board({
     for (const e of events) set.add(dayFloor(new Date(e.eventTime).getTime()));
     return [...set].sort((a, b) => a - b);
   }, [events]);
-  const { mapWindow, prefs } = useSettings();
+  const { mapWindow, setMapWindow, prefs } = useSettings();
   const windowDays = mapWindow === "all" ? Math.max(1, days.length) : mapWindow === "wide" ? 8 : 4;
   const maxStartIdx = Math.max(0, days.length - windowDays);
   const [startIdxRaw, setStartIdx] = useState<number | null>(null);
@@ -325,12 +325,49 @@ export function Board({
           {/* Member visibility is picked by tapping a timeline row — the map
               always shows the active member's runs. */}
           <DetailOnly pref="headers">
-            <h2 style={headerStyle}>
-              Map
+            <h2
+              style={{
+                ...headerStyle,
+                padding: 0,
+                display: "flex",
+                alignItems: "stretch",
+                justifyContent: "space-between",
+                gap: 12,
+              }}
+            >
+              <span style={{ display: "flex", alignItems: "stretch" }}>
+                <span
+                  style={{ display: "flex", alignItems: "center", padding: "6px 12px 6px 16px" }}
+                >
+                  Map
+                </span>
+                {/* Window-width tabs: date columns shown at a time */}
+                <HeaderTabs
+                  value={mapWindow}
+                  options={[
+                    { v: "normal", label: "4" },
+                    { v: "wide", label: "8" },
+                    { v: "all", label: "All" },
+                  ]}
+                  onChange={setMapWindow}
+                />
+              </span>
               {activeUserId != null && memberOf.get(activeUserId) ? (
-                <span style={{ textTransform: "none", letterSpacing: 0, fontWeight: 400 }}>
-                  {" "}
-                  · {memberOf.get(activeUserId)!.displayName}
+                <span
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    paddingRight: 16,
+                    textTransform: "none",
+                    letterSpacing: 0,
+                    fontWeight: 400,
+                    minWidth: 0,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {memberOf.get(activeUserId)!.displayName}
                 </span>
               ) : null}
             </h2>
