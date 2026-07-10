@@ -251,6 +251,45 @@ export function Board({
           onSelectUser={setActiveUserId}
           mask={days.length > 0 ? { start: windowStart, end: windowEnd } : null}
         />
+
+        {/* Window picker, attached under the timeline it masks */}
+        {days.length > 0 ? (
+          <div
+            className="bleed"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              padding: "8px 16px",
+              background: "var(--panel)",
+              borderBottom: "1px solid var(--border)",
+            }}
+          >
+            <input
+              type="range"
+              min={0}
+              max={maxStartIdx}
+              step={1}
+              value={startIdx}
+              onChange={(ev) => setStartIdx(Number(ev.target.value))}
+              disabled={maxStartIdx === 0}
+              aria-label="Date range shown on the map"
+              style={{ flex: 1 }}
+            />
+            {prefs.sliderDates ? (
+              <span
+                style={{
+                  fontSize: 11,
+                  color: "var(--muted)",
+                  whiteSpace: "nowrap",
+                  fontVariantNumeric: "tabular-nums",
+                }}
+              >
+                {fmtDay(windowStart)} – {fmtDay(windowEnd)}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
       </section>
 
       <section>
@@ -268,44 +307,6 @@ export function Board({
               ) : null}
             </h2>
           </DetailOnly>
-
-          {/* Window picker: slides the map's clamp across the date columns */}
-          {days.length > 0 ? (
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-                padding: "8px 16px",
-                background: "var(--panel)",
-                borderBottom: "1px solid var(--border)",
-              }}
-            >
-              <input
-                type="range"
-                min={0}
-                max={maxStartIdx}
-                step={1}
-                value={startIdx}
-                onChange={(ev) => setStartIdx(Number(ev.target.value))}
-                disabled={maxStartIdx === 0}
-                aria-label="Date range shown on the map"
-                style={{ flex: 1 }}
-              />
-              {prefs.sliderDates ? (
-                <span
-                  style={{
-                    fontSize: 11,
-                    color: "var(--muted)",
-                    whiteSpace: "nowrap",
-                    fontVariantNumeric: "tabular-nums",
-                  }}
-                >
-                  {fmtDay(windowStart)} – {fmtDay(windowEnd)}
-                </span>
-              ) : null}
-            </div>
-          ) : null}
 
           {/* Just the reservoir: the canonical loop outline, nothing else.
               Flex `order` places the map after the detail strip visually. */}
