@@ -21,7 +21,15 @@ export function TierMarks({ marks }: { marks: TierMark[] }) {
   const { prefs } = useSettings();
   // With the stat columns hidden, the watermarks carry the counts full-size.
   const clean = !prefs.statColumns;
-  const minGapPct = clean ? 10 : 5;
+
+  // Marks are right-aligned at their boundary, so two marks only collide when
+  // the right-hand one's own text would reach back over the left one. Text
+  // width is estimated from label length (% of a ~400px bar).
+  const charPct = clean ? 3.2 : 1.2;
+  const collides = (a: TierMark, b: TierMark) => {
+    const hi = a.pct >= b.pct ? a : b;
+    return Math.abs(a.pct - b.pct) < hi.label.length * charPct + 1;
+  };
 
   // Place the main mark first, then the rest outermost-first, keeping each
   // only if it clears every already-placed mark.
@@ -31,7 +39,7 @@ export function TierMarks({ marks }: { marks: TierMark[] }) {
   ].filter((mk) => mk.pct > 0);
   const visible: TierMark[] = [];
   for (const mk of candidates) {
-    if (visible.every((v) => Math.abs(v.pct - mk.pct) > minGapPct)) visible.push(mk);
+    if (!visible.some((v) => collides(v, mk))) visible.push(mk);
   }
 
   return (

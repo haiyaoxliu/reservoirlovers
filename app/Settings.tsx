@@ -19,6 +19,10 @@ export interface DetailPrefs {
   sliderDates: boolean;
   /** Second line (date · activity) in the selection detail panel. */
   detailMeta: boolean;
+  /** Timeline header row: the year/month/day stack plus the Strava mark. */
+  timelineDates: boolean;
+  /** Colour tint on the active member's timeline row. */
+  userHighlight: boolean;
 }
 
 const DEFAULT_PREFS: DetailPrefs = {
@@ -27,6 +31,8 @@ const DEFAULT_PREFS: DetailPrefs = {
   statColumns: true,
   sliderDates: true,
   detailMeta: true,
+  timelineDates: true,
+  userHighlight: true,
 };
 
 const SettingsContext = createContext<{
@@ -277,6 +283,7 @@ function Modal({ onClose, children }: { onClose: () => void; children: React.Rea
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
+          position: "relative",
           background: "var(--panel-2)",
           border: "1px solid var(--border)",
           borderRadius: 12,
@@ -285,21 +292,31 @@ function Modal({ onClose, children }: { onClose: () => void; children: React.Rea
           maxWidth: 360,
         }}
       >
-        {children}
         <button
           onClick={onClose}
+          aria-label="Close"
           style={{
-            marginTop: 18,
+            position: "absolute",
+            top: 10,
+            right: 10,
+            width: 26,
+            height: 26,
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
             background: "transparent",
             color: "var(--muted)",
-            border: "1px solid var(--border-btn)",
-            borderRadius: 8,
-            padding: "6px 12px",
+            border: "none",
+            borderRadius: 6,
             cursor: "pointer",
+            fontSize: 16,
+            lineHeight: 1,
+            padding: 0,
           }}
         >
-          Close
+          ×
         </button>
+        {children}
       </div>
     </div>
   );
@@ -326,8 +343,10 @@ const DETAIL_TOGGLES: { key: keyof DetailPrefs; label: string }[] = [
   { key: "headers", label: "Section headers" },
   { key: "rowChrome", label: "Rank & avatars" },
   { key: "statColumns", label: "Stat columns" },
+  { key: "timelineDates", label: "Timeline dates" },
   { key: "sliderDates", label: "Slider dates" },
   { key: "detailMeta", label: "Selection info" },
+  { key: "userHighlight", label: "User highlight" },
 ];
 
 /** Header buttons: detail visibility controls, settings, and sign-out. */
@@ -364,6 +383,23 @@ export function HeaderActions() {
       {openDetail ? (
         <Modal onClose={() => setOpenDetail(false)}>
           <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 16 }}>Detail visibility</div>
+          <Row label="Everything">
+            <Segmented
+              value={
+                DETAIL_TOGGLES.every((t) => prefs[t.key])
+                  ? "show"
+                  : DETAIL_TOGGLES.every((t) => !prefs[t.key])
+                    ? "hide"
+                    : ("" as "show" | "hide")
+              }
+              options={[
+                { v: "show", label: "Show" },
+                { v: "hide", label: "Hide" },
+              ]}
+              onChange={(v) => DETAIL_TOGGLES.forEach((t) => setPref(t.key, v === "show"))}
+            />
+          </Row>
+          <div style={{ borderTop: "1px solid var(--border)", margin: "0 0 12px" }} />
           {DETAIL_TOGGLES.map((t) => (
             <Row key={t.key} label={t.label}>
               <Segmented

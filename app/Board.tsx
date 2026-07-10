@@ -52,23 +52,11 @@ export function Board({
   currentUserId: number | null;
 }) {
   const [selected, setSelected] = useState<TimelineEvent | null>(null);
-  // By default only the viewer's own runs are shown on the map.
-  const [hidden, setHidden] = useState<Set<number>>(
-    () =>
-      new Set(
-        currentUserId == null
-          ? []
-          : members.filter((m) => m.userId !== currentUserId).map((m) => m.userId),
-      ),
+  // One member's runs show on the map at a time, picked by tapping their
+  // timeline row (or any of their events). Defaults to the viewer.
+  const [activeUserId, setActiveUserId] = useState<number | null>(
+    currentUserId ?? members[0]?.userId ?? null,
   );
-
-  const toggle = (userId: number) =>
-    setHidden((prev) => {
-      const next = new Set(prev);
-      if (next.has(userId)) next.delete(userId);
-      else next.add(userId);
-      return next;
-    });
 
   const memberOf = useMemo(
     () => new Map(members.map((m) => [m.userId, m])),
@@ -105,15 +93,14 @@ export function Board({
   }, [events, windowStart, windowEnd]);
 
   // Select an event: slide the window to cover its day if needed (centred
-  // when possible), and solo the member on the map — their pill on, all
-  // others off.
+  // when possible), and make its member the active one on the map.
   const selectEvent = (e: TimelineEvent) => {
     setSelected(e);
     const idx = days.indexOf(dayFloor(new Date(e.eventTime).getTime()));
     if (idx >= 0 && (idx < startIdx || idx > startIdx + windowDays - 1)) {
       setStartIdx(Math.max(0, Math.min(idx - Math.floor(windowDays / 2), maxStartIdx)));
     }
-    setHidden(new Set(members.filter((m) => m.userId !== e.userId).map((m) => m.userId)));
+    setActiveUserId(e.userId);
   };
 
   // Prev/next within the selected member's own event sequence (oldest first).
@@ -241,13 +228,13 @@ export function Board({
   const visibleDrawn = useMemo(
     () =>
       drawn
-        .filter(({ e }) => !hidden.has(e.userId))
+        .filter(({ e }) => e.userId === activeUserId)
         .sort(
           (a, b) =>
             Number(a.e.id === selected?.id) - Number(b.e.id === selected?.id) ||
             Number(a.full) - Number(b.full),
         ),
-    [drawn, hidden, selected],
+    [drawn, activeUserId, selected],
   );
 
   const selectedMember = selected ? memberOf.get(selected.userId) : null;
@@ -260,65 +247,25 @@ export function Board({
           members={members}
           selected={selected}
           onSelect={selectEvent}
+          activeUserId={activeUserId}
+          onSelectUser={setActiveUserId}
           mask={days.length > 0 ? { start: windowStart, end: windowEnd } : null}
         />
       </section>
 
       <section>
         <div className="bleed" style={{ display: "flex", flexDirection: "column" }}>
-          {/* Header (hideable) carries the member toggles, so they hide with
-              it; the slider row below always stays. */}
+          {/* Member visibility is picked by tapping a timeline row — the map
+              always shows the active member's runs. */}
           <DetailOnly pref="headers">
-            <h2
-              style={{
-                ...headerStyle,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 12,
-              }}
-            >
-              <span>Map</span>
-              <span
-                style={{
-                  display: "flex",
-                  flexWrap: "wrap",
-                  justifyContent: "flex-end",
-                  gap: 6,
-                  textTransform: "none",
-                  letterSpacing: 0,
-                }}
-              >
-                {members.map((m) => {
-                  const off = hidden.has(m.userId);
-                  const compact = members.length > 5;
-                  return (
-                    <button
-                      key={m.userId}
-                      onClick={() => toggle(m.userId)}
-                      aria-pressed={!off}
-                      title={m.displayName}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 6,
-                        background: off ? "transparent" : m.color,
-                        border: `1px solid ${off ? "var(--border-btn)" : m.color}`,
-                        borderRadius: 999,
-                        padding: compact ? 2 : "2px 10px 2px 3px",
-                        color: off ? "var(--muted)" : "#04121f",
-                        fontWeight: off ? 400 : 600,
-                        fontSize: 12,
-                        cursor: "pointer",
-                        opacity: off ? 0.55 : 1,
-                      }}
-                    >
-                      <Avatar url={m.avatarUrl} name={m.displayName} color={m.color} size={20} />
-                      {compact ? null : m.displayName}
-                    </button>
-                  );
-                })}
-              </span>
+            <h2 style={headerStyle}>
+              Map
+              {activeUserId != null && memberOf.get(activeUserId) ? (
+                <span style={{ textTransform: "none", letterSpacing: 0, fontWeight: 400 }}>
+                  {" "}
+                  · {memberOf.get(activeUserId)!.displayName}
+                </span>
+              ) : null}
             </h2>
           </DetailOnly>
 
@@ -472,7 +419,8 @@ export function Board({
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
                     <span style={{ fontWeight: 600 }}>{selected.displayName}</span>
-                    {/* The stat links to the Strava activity itself */}
+                    {/* The stat links to the Strava activity itself, coloured
+                        by tier like the rest of the site. */}
                     <a
                       href={`https://www.strava.com/activities/${selected.stravaActivityId}`}
                       target="_blank"
@@ -481,27 +429,33 @@ export function Board({
                         display: "inline-flex",
                         alignItems: "center",
                         gap: 5,
-                        color:
-                          selected.kind === "full"
-                            ? (selectedMember?.color ?? "var(--accent)")
-                            : "var(--muted)",
+                        color: selectedMember?.color
+                          ? selected.kind === "full"
+                            ? selected.percent >= 100
+                              ? selectedMember.color
+                              : `${selectedMember.color}b3`
+                            : `${selectedMember.color}80`
+                          : "var(--accent)",
                         fontWeight: selected.kind === "full" ? 600 : 400,
                         fontSize: selected.kind === "full" ? undefined : 13,
                       }}
                     >
                       {!prefs.detailMeta || selected.kind === "full" ? (
-                        // Uniform compact stat: time for clean 100% loops,
-                        // time · % (or just %) for everything else.
+                        // Uniform stat: time for clean 100% loops, time · %
+                        // for everything else (partials use segment time).
                         [
-                          formatDuration(selected.elapsedSeconds),
+                          formatDuration(selected.durationSeconds),
                           selected.percent < 100 ? `${selected.percent}%` : null,
                         ]
                           .filter(Boolean)
                           .join(" · ")
                       ) : (
                         <>
-                          partial · {selected.percent}% (
-                          <Distance km={((selected.percent / 100) * loop.totalMeters) / 1000} />)
+                          partial ·{" "}
+                          {[formatDuration(selected.durationSeconds), `${selected.percent}%`]
+                            .filter(Boolean)
+                            .join(" · ")}{" "}
+                          (<Distance km={((selected.percent / 100) * loop.totalMeters) / 1000} />)
                         </>
                       )}
                       <ExternalLinkIcon size={11} />

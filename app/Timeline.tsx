@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import type { TimelineEvent } from "@/lib/queries";
 import { Avatar } from "./Avatar";
-import { DetailOnly } from "./Settings";
+import { DetailOnly, useSettings } from "./Settings";
 
 /** Strava's chevron mark, tinted to the site's muted grayscale. */
 function StravaIcon({ size = 12 }: { size?: number }) {
@@ -34,7 +34,7 @@ export function stravaProfileUrl(athleteId: number): string {
 
 const LANE_H = 46;
 const LABEL_W = 72;
-const HEADER_H = 28;
+const HEADER_H = 46;
 /** Horizontal spacing between same-day dots in one lane. */
 const DOT_SPACING = 16;
 const MIN_COL_W = 44;
@@ -55,15 +55,22 @@ export function Timeline({
   members,
   selected,
   onSelect,
+  activeUserId,
+  onSelectUser,
   mask,
 }: {
   events: TimelineEvent[];
   members: TimelineMember[];
   selected: TimelineEvent | null;
   onSelect: (e: TimelineEvent) => void;
+  /** Member whose runs the map shows; their row is highlighted. */
+  activeUserId: number | null;
+  /** Tapping a member's row makes them the active one. */
+  onSelectUser: (userId: number) => void;
   /** Time window highlighted over the day columns (the map's clamp). */
   mask?: { start: number; end: number } | null;
 }) {
+  const { prefs } = useSettings();
   // Ordinal axis: one column per calendar day that has at least one loop —
   // empty stretches between run days take up no space at all.
   const { laneEvents, width, ticks, minT } = useMemo(() => {
@@ -260,27 +267,35 @@ export function Timeline({
           }}
         >
           {/* Corner cell: Strava mark — the avatars below link to profiles */}
-          <div
-            style={{
-              height: HEADER_H,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "var(--muted)",
-            }}
-            title="Avatars link to Strava profiles"
-          >
-            <StravaIcon size={16} />
-          </div>
+          {prefs.timelineDates ? (
+            <div
+              style={{
+                height: HEADER_H,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "var(--muted)",
+              }}
+              title="Avatars link to Strava profiles"
+            >
+              <StravaIcon size={16} />
+            </div>
+          ) : null}
           {members.map((m) => (
             <div
               key={m.userId}
+              onClick={() => onSelectUser(m.userId)}
               style={{
                 height: LANE_H,
                 display: "flex",
                 alignItems: "center",
                 padding: "0 8px",
                 borderTop: "1px solid var(--border-soft)",
+                cursor: "pointer",
+                background:
+                  prefs.userHighlight && m.userId === activeUserId
+                    ? `${m.color}26`
+                    : "transparent",
               }}
             >
               <a
@@ -330,16 +345,60 @@ export function Timeline({
                 }}
               />
             ) : null}
-            {/* Slim spacer row (dates live in the detail panel and slider) */}
-            <div style={{ height: HEADER_H }} />
+            {/* Day markers — stacked year / month / day; year and month
+                print on change. Toggleable with the Strava corner cell. */}
+            {prefs.timelineDates ? (
+              <div style={{ position: "relative", height: HEADER_H }}>
+                {ticks.map((t, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      position: "absolute",
+                      left: t.x,
+                      width: t.w,
+                      top: 0,
+                      height: HEADER_H,
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "flex-end",
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                    }}
+                  >
+                    <span style={{ height: 12, fontSize: 9, lineHeight: "12px", color: "var(--muted)" }}>
+                      {t.year}
+                    </span>
+                    <span style={{ height: 13, fontSize: 10, lineHeight: "13px", color: "var(--muted)" }}>
+                      {t.month}
+                    </span>
+                    <span style={{ height: 15, fontSize: 11, lineHeight: "15px", fontWeight: 600 }}>
+                      {t.day}
+                    </span>
+                    <span style={{ width: 1, height: 4, background: "var(--border-btn)" }} />
+                  </div>
+                ))}
+              </div>
+            ) : null}
 
-          {/* Lanes — dots only; the member rail is outside the scroll area */}
+          {/* Lanes — dots only; the member rail is outside the scroll area.
+              Tapping anywhere in a lane makes that member active. */}
           {members.map((m) => {
             const evs = laneEvents.get(m.userId) ?? [];
             return (
               <div
                 key={m.userId}
-                style={{ position: "relative", height: LANE_H, borderTop: "1px solid var(--border-soft)" }}
+                onClick={() => onSelectUser(m.userId)}
+                style={{
+                  position: "relative",
+                  height: LANE_H,
+                  borderTop: "1px solid var(--border-soft)",
+                  cursor: "pointer",
+                  background:
+                    prefs.userHighlight && m.userId === activeUserId
+                      ? `${m.color}14`
+                      : "transparent",
+                }}
               >
                   {evs.map((e) => {
                     const full = e.kind === "full";
@@ -351,7 +410,10 @@ export function Timeline({
                       <button
                         key={e.id}
                         data-eid={e.id}
-                        onClick={() => onSelect(e)}
+                        onClick={(ev) => {
+                          ev.stopPropagation();
+                          onSelect(e);
+                        }}
                         title={
                           full
                             ? exact

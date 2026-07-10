@@ -64,6 +64,8 @@ export interface TimelineEvent {
   direction: string | null; // "ccw" | "cw" | "mixed"
   eventTime: string; // ISO — loop completion
   elapsedSeconds: number | null;
+  /** Lap time for fulls; time spent on the credited segment for partials. */
+  durationSeconds: number | null;
   activityName: string | null;
   /** Strava activity id, for linking to the run itself. */
   stravaActivityId: number;
@@ -86,6 +88,7 @@ export async function getTimeline(): Promise<TimelineEvent[]> {
       direction: loopEvents.direction,
       eventTime: loopEvents.eventTime,
       elapsedSeconds: loopEvents.elapsedSeconds,
+      segmentStartTime: loopEvents.segmentStartTime,
       activityName: activities.name,
       stravaActivityId: activities.stravaActivityId,
       endP: loopEvents.endP,
@@ -105,6 +108,11 @@ export async function getTimeline(): Promise<TimelineEvent[]> {
     direction: r.direction,
     eventTime: r.eventTime.toISOString(),
     elapsedSeconds: r.elapsedSeconds,
+    durationSeconds:
+      r.elapsedSeconds ??
+      (r.segmentStartTime
+        ? Math.round((r.eventTime.getTime() - r.segmentStartTime.getTime()) / 1000)
+        : null),
     activityName: r.activityName,
     stravaActivityId: r.stravaActivityId,
     endP: r.endP,

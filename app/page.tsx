@@ -76,10 +76,10 @@ export default async function HomePage() {
             // The stripe doubles as the relative bar, in three opacity tiers:
             // clean 100% loops (brightest) → 98-99% tolerance fulls (slightly
             // dimmer) → partial credit (faint), out to the total score.
-            // Every bar starts with a fixed pad of the full-loop colour so
-            // the main count (and the rank, in detail view) always has a
-            // stripe to sit on; real values scale into the remaining width.
-            const BAR_PAD_PCT = 12;
+            // Every bar starts with a fixed pad of the full-loop colour wide
+            // enough for the name (and rank, in detail view) to sit on; real
+            // values scale into the remaining width.
+            const BAR_PAD_PCT = 28;
             const pctOf = (v: number) =>
               BAR_PAD_PCT + (maxTotal > 0 ? (v / maxTotal) * (100 - BAR_PAD_PCT) : 0);
             const exactPct = pctOf(r.exactFullPercent);
