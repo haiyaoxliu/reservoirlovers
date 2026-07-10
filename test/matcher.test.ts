@@ -66,9 +66,29 @@ describe("matcher — partial credit and quirks", () => {
     expect(ev[0].direction).toBe("mixed");
   });
 
-  it("ignores a brief graze of the track (below MIN_SEG_PCT)", () => {
+  it("credits a short on-track stretch as a small partial (≥ 1%)", () => {
     const ev = matchActivity(synthRun({ moves: [{ type: "run", deltaPct: 3 }] }));
+    expect(fulls(ev)).toHaveLength(0);
+    expect(partials(ev)).toHaveLength(1);
+    expect(partials(ev)[0].percent).toBeGreaterThanOrEqual(1);
+    expect(partials(ev)[0].percent).toBeLessThanOrEqual(4);
+  });
+
+  it("ignores a graze too short to commit a single checkpoint", () => {
+    const ev = matchActivity(synthRun({ moves: [{ type: "run", deltaPct: 0.4 }] }));
     expect(ev).toHaveLength(0);
+  });
+
+  it("reports where on the loop each event ended", () => {
+    const ev = matchActivity(
+      synthRun({ startPct: 37, moves: [{ type: "run", deltaPct: 130 }] }),
+    );
+    const f = fulls(ev)[0];
+    const p = partials(ev)[0];
+    // A full loop ends where the segment began; the partial ~30% further on.
+    expect(Math.abs(f.endP - 37)).toBeLessThanOrEqual(2);
+    expect(p.endP).toBeGreaterThanOrEqual(63);
+    expect(p.endP).toBeLessThanOrEqual(71);
   });
 });
 

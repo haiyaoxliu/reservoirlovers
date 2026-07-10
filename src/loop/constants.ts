@@ -58,8 +58,9 @@ export const MIN_TELEPORT_M = 60;
 /** Recording gaps up to this long may be bridged if speed/direction are sane. */
 export const GAP_BRIDGE_S = 60;
 
-/** Segments crediting less than this many percent are discarded. */
-export const MIN_SEG_PCT = 5;
+/** Segments crediting less than this many percent are discarded.
+ *  1% ≈ 25 m — the smallest increment that earns partial credit. */
+export const MIN_SEG_PCT = 1;
 
 /**
  * Bridle-path defense: discard a segment whose *median* cross-track distance
@@ -72,7 +73,7 @@ export const MAX_MEDIAN_D_M = 12;
 export const MIN_ACTIVITY_M = 150;
 
 /** Bump when any constant above changes, to trigger reprocessing of activities. */
-export const ALGO_VERSION = 3;
+export const ALGO_VERSION = 4;
 
 /** Sport types that earn loop credit (foot-powered). */
 export const COUNTING_SPORT_TYPES = new Set([

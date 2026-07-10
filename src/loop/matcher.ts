@@ -28,6 +28,8 @@ export interface LoopEvent {
    *  completion, or segment start for the first). Null for partials. */
   elapsedSeconds: number | null;
   direction: Direction;
+  /** Loop position (checkpoint index 0..N-1) where the event ended. */
+  endP: number;
 }
 
 export interface GpsFix {
@@ -58,10 +60,12 @@ class Segment {
   committed = 0;
   lastDir: 0 | 1 | -1 = 0;
   commits: Commit[] = [];
+  readonly originP: number;
   prevP: number;
   prevT: number;
 
   constructor(startP: number, startT: number, startD: number) {
+    this.originP = startP;
     this.prevP = startP;
     this.prevT = startT;
     this.fixes.push({ t: startT, d: startD });
@@ -184,10 +188,16 @@ function finalizeSegment(seg: Segment, out: LoopEvent[]): void {
     net === total ? "ccw" : net === -total ? "cw" : "mixed";
 
   const segmentStartTime = seg.commits[0].t;
+  // Loop position where the boundary of commit k landed: the segment's entry
+  // position plus the signed committed progress up to that commit.
+  const posAt = (signed: number) =>
+    ((Math.round(seg.originP + signed) % LOOP_N) + LOOP_N) % LOOP_N;
 
   let emitted = 0;
   let lastFullTime = segmentStartTime;
+  let signed = 0;
   for (let k = 0; k < seg.commits.length; k++) {
+    signed += seg.commits[k].dir;
     const count = k + 1;
     if (count % LOOP_N === 0) {
       const completion = seg.commits[k].t;
@@ -198,6 +208,7 @@ function finalizeSegment(seg: Segment, out: LoopEvent[]): void {
         segmentStartTime,
         elapsedSeconds: Math.round(completion - lastFullTime),
         direction,
+        endP: posAt(signed),
       });
       lastFullTime = completion;
       emitted += LOOP_N;
@@ -213,6 +224,7 @@ function finalizeSegment(seg: Segment, out: LoopEvent[]): void {
       segmentStartTime,
       elapsedSeconds: null,
       direction,
+      endP: posAt(signed),
     });
   }
 }

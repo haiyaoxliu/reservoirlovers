@@ -18,8 +18,10 @@ and a horizontally-swipeable timeline with a dot at every loop completion.
   either direction**, with hysteresis against GPS jitter and a median-cross-track
   guard so the parallel bridle path never earns credit. The canonical loop
   geometry is **seeded from the Strava segment's own polyline** (see below) — no
-  hand-recorded lap needed. Whole loops are counted; the engine also tracks each
-  lap's time for a fastest-loop PR.
+  hand-recorded lap needed. Whole loops are the headline score; partial travel
+  is credited too, down to 1% of the loop (~25 m), and surfaces as a separate
+  total-distance stat. The engine also tracks each lap's time for a fastest-loop
+  PR and where on the loop each event ended (for the map).
 - **Why not Strava segment efforts?** Loop segments only register when you start
   *and* finish at the segment's exact origin point — start elsewhere and a single
   lap counts as zero, and multi-lap runs come up one short. The matcher avoids

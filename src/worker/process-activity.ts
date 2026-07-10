@@ -78,6 +78,7 @@ export async function processActivity(
           segmentStartTime: new Date(startDate.getTime() + e.segmentStartTime * 1000),
           elapsedSeconds: e.elapsedSeconds,
           direction: e.direction,
+          endP: e.endP,
           ordinal: i,
         })),
       );

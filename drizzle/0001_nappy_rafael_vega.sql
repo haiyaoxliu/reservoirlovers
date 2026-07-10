@@ -1,0 +1,1 @@
+ALTER TABLE "loop_events" ADD COLUMN "end_p" smallint;

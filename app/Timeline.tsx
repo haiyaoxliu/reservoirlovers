@@ -1,8 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import type { TimelineEvent } from "@/lib/queries";
-import { formatDuration } from "@/lib/queries";
 import { ExternalLinkIcon } from "./ExternalLinkIcon";
 import { Avatar } from "./Avatar";
 
@@ -14,7 +13,7 @@ export interface TimelineMember {
   color: string;
 }
 
-function stravaProfileUrl(athleteId: number): string {
+export function stravaProfileUrl(athleteId: number): string {
   return `https://www.strava.com/athletes/${athleteId}`;
 }
 
@@ -33,12 +32,14 @@ interface Positioned extends TimelineEvent {
 export function Timeline({
   events,
   members,
+  selected,
+  onSelect,
 }: {
   events: TimelineEvent[];
   members: TimelineMember[];
+  selected: TimelineEvent | null;
+  onSelect: (e: TimelineEvent) => void;
 }) {
-  const [selected, setSelected] = useState<Positioned | null>(null);
-
   // Ordinal axis: one column per calendar day that has at least one loop —
   // empty stretches between run days take up no space at all.
   const { laneEvents, width, ticks, minT } = useMemo(() => {
@@ -106,16 +107,6 @@ export function Timeline({
     return { laneEvents: byLane, width: acc, ticks: dayTicks, minT: sorted[0].t };
   }, [events, members]);
 
-  const colorOf = useMemo(() => {
-    const m = new Map(members.map((x) => [x.userId, x.color]));
-    return (id: number) => m.get(id) ?? "#888";
-  }, [members]);
-
-  const athleteOf = useMemo(() => {
-    const m = new Map(members.map((x) => [x.userId, x.stravaAthleteId]));
-    return (id: number) => m.get(id);
-  }, [members]);
-
   if (events.length === 0) {
     return (
       <p style={{ color: "var(--muted)" }}>
@@ -126,49 +117,92 @@ export function Timeline({
 
   return (
     <div style={{ position: "relative" }}>
+      {/* The rail lives OUTSIDE the scroll container so the elastic overscroll
+          bounce at the data's end only moves the dots/markers, never the rail. */}
       <div
         className="bleed"
         style={{
-          overflowX: "auto",
-          overflowY: "hidden",
-          WebkitOverflowScrolling: "touch",
+          display: "flex",
           borderTop: "1px solid #232a36",
           borderBottom: "1px solid #232a36",
           background: "var(--panel)",
         }}
       >
-        <div style={{ position: "relative", width: LABEL_W + width, minWidth: "100%" }}>
-          {/* Header row: the section title heads the date-marker stack the
+        <div
+          style={{
+            width: LABEL_W,
+            flexShrink: 0,
+            background: "var(--panel-2)",
+            borderRight: "1px solid #232a36",
+          }}
+        >
+          {/* Header cell: the section title heads the date-marker stack the
               same way member avatars head the dot lanes below. */}
-          <div style={{ position: "relative", height: HEADER_H }}>
-            <div
+          <div
+            style={{
+              height: HEADER_H,
+              display: "flex",
+              alignItems: "flex-end",
+              padding: "0 8px 6px",
+            }}
+          >
+            <h2
               style={{
-                position: "sticky",
-                left: 0,
-                zIndex: 2,
-                width: LABEL_W,
-                height: HEADER_H,
-                display: "flex",
-                alignItems: "flex-end",
-                padding: "0 8px 6px",
-                background: "var(--panel-2)",
-                borderRight: "1px solid #232a36",
+                margin: 0,
+                fontSize: 10,
+                fontWeight: 600,
+                color: "var(--muted)",
+                textTransform: "uppercase",
+                letterSpacing: 1,
               }}
             >
-              <h2
+              Timeline
+            </h2>
+          </div>
+          {members.map((m) => (
+            <div
+              key={m.userId}
+              style={{
+                height: LANE_H,
+                display: "flex",
+                alignItems: "center",
+                padding: "0 8px",
+                borderTop: "1px solid #1b212c",
+              }}
+            >
+              <a
+                href={stravaProfileUrl(m.stravaAthleteId)}
+                target="_blank"
+                rel="noreferrer"
+                aria-label={`${m.displayName} on Strava`}
+                title={m.displayName}
                 style={{
-                  margin: 0,
-                  fontSize: 10,
-                  fontWeight: 600,
-                  color: "var(--muted)",
-                  textTransform: "uppercase",
-                  letterSpacing: 1,
+                  flex: 1,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 6,
+                  color: "inherit",
                 }}
               >
-                Timeline
-              </h2>
+                <Avatar url={m.avatarUrl} name={m.displayName} color={m.color} />
+                <ExternalLinkIcon size={11} />
+              </a>
             </div>
-            <div style={{ position: "absolute", top: 0, left: LABEL_W, right: 0, height: HEADER_H }}>
+          ))}
+        </div>
+
+        <div
+          style={{
+            flex: 1,
+            minWidth: 0,
+            overflowX: "auto",
+            overflowY: "hidden",
+            WebkitOverflowScrolling: "touch",
+          }}
+        >
+          <div style={{ position: "relative", width, minWidth: "100%" }}>
+            <div style={{ position: "relative", height: HEADER_H }}>
             {ticks.map((t, i) => (
               <div
                 key={i}
@@ -199,9 +233,8 @@ export function Timeline({
               </div>
             ))}
             </div>
-          </div>
 
-          {/* Lanes */}
+          {/* Lanes — dots only; the member rail is outside the scroll area */}
           {members.map((m) => {
             const evs = laneEvents.get(m.userId) ?? [];
             return (
@@ -209,46 +242,10 @@ export function Timeline({
                 key={m.userId}
                 style={{ position: "relative", height: LANE_H, borderTop: "1px solid #1b212c" }}
               >
-                <div
-                  style={{
-                    position: "sticky",
-                    left: 0,
-                    zIndex: 2,
-                    width: LABEL_W,
-                    height: LANE_H,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    padding: "0 8px",
-                    background: "var(--panel-2)",
-                    borderRight: "1px solid #232a36",
-                  }}
-                >
-                  <a
-                    href={stravaProfileUrl(m.stravaAthleteId)}
-                    target="_blank"
-                    rel="noreferrer"
-                    aria-label={`${m.displayName} on Strava`}
-                    title={m.displayName}
-                    style={{
-                      flex: 1,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      gap: 6,
-                      color: "inherit",
-                    }}
-                  >
-                    <Avatar url={m.avatarUrl} name={m.displayName} color={m.color} />
-                    <ExternalLinkIcon size={11} />
-                  </a>
-                </div>
-
-                <div style={{ position: "absolute", top: 0, left: LABEL_W, right: 0, height: LANE_H }}>
                   {evs.map((e) => (
                     <button
                       key={e.id}
-                      onClick={() => setSelected(e)}
+                      onClick={() => onSelect(e)}
                       title={`Loop — ${new Date(e.eventTime).toLocaleDateString()}`}
                       style={{
                         position: "absolute",
@@ -260,96 +257,17 @@ export function Timeline({
                         padding: 0,
                         cursor: "pointer",
                         background: m.color,
-                        border: `2px solid ${m.color}`,
+                        border: `2px solid ${selected?.id === e.id ? "#fff" : m.color}`,
                         boxShadow: `0 0 6px ${m.color}66`,
                       }}
                     />
                   ))}
-                </div>
               </div>
             );
           })}
-        </div>
-      </div>
-
-      {selected ? (
-        <div
-          onClick={() => setSelected(null)}
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.5)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 20,
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              background: "var(--panel-2)",
-              border: `1px solid ${colorOf(selected.userId)}`,
-              borderRadius: 12,
-              padding: 20,
-              minWidth: 240,
-              maxWidth: 320,
-            }}
-          >
-            <div style={{ fontWeight: 600, marginBottom: 6 }}>
-              {athleteOf(selected.userId) ? (
-                <a
-                  href={stravaProfileUrl(athleteOf(selected.userId)!)}
-                  target="_blank"
-                  rel="noreferrer"
-                  style={{ color: "inherit", display: "inline-flex", alignItems: "center", gap: 6 }}
-                >
-                  {selected.displayName}
-                  <ExternalLinkIcon size={11} />
-                </a>
-              ) : (
-                selected.displayName
-              )}
-            </div>
-            <div style={{ fontSize: 22, marginBottom: 8, color: colorOf(selected.userId) }}>
-              🔵 Reservoir loop
-            </div>
-            {formatDuration(selected.elapsedSeconds) ? (
-              <div style={{ marginBottom: 6 }}>
-                Loop time <strong>{formatDuration(selected.elapsedSeconds)}</strong>
-              </div>
-            ) : null}
-            {selected.activityName ? (
-              <div style={{ color: "var(--muted)", fontSize: 13, marginBottom: 6 }}>
-                {selected.activityName}
-              </div>
-            ) : null}
-            <div style={{ color: "var(--muted)", fontSize: 14 }}>
-              {new Date(selected.eventTime).toLocaleString("en-US", {
-                weekday: "short",
-                month: "short",
-                day: "numeric",
-                hour: "numeric",
-                minute: "2-digit",
-              })}
-            </div>
-            <button
-              onClick={() => setSelected(null)}
-              style={{
-                marginTop: 16,
-                background: "transparent",
-                color: "var(--muted)",
-                border: "1px solid #333c4a",
-                borderRadius: 8,
-                padding: "6px 12px",
-                cursor: "pointer",
-              }}
-            >
-              Close
-            </button>
           </div>
         </div>
-      ) : null}
+      </div>
 
       <p style={{ color: "var(--muted)", fontSize: 12, marginTop: 8 }}>
         Swipe left/right · each dot is one completed loop · tap for details

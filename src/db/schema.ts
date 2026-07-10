@@ -82,6 +82,9 @@ export const loopEvents = pgTable(
     segmentStartTime: timestamp("segment_start_time", { withTimezone: true }),
     elapsedSeconds: integer("elapsed_seconds"),
     direction: text("direction"),
+    /** Loop position (checkpoint 0-99) where the event ended; null on rows
+     *  processed before ALGO_VERSION 4. */
+    endP: smallint("end_p"),
     ordinal: smallint("ordinal").notNull(),
   },
   (t) => [

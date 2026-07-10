@@ -8,6 +8,8 @@ export interface LeaderboardRow {
   displayName: string;
   avatarUrl: string | null;
   loops: number;
+  /** Total credited loop travel in percent-of-loop units (full + partial). */
+  totalPercent: number;
   /** Fastest single loop in seconds, if any. */
   fastestSeconds: number | null;
 }
@@ -21,12 +23,16 @@ export async function getLeaderboard(): Promise<LeaderboardRow[]> {
       displayName: users.displayName,
       avatarUrl: users.avatarUrl,
       loops: sql<number>`coalesce(sum(case when ${loopEvents.kind} = 'full' then 1 else 0 end), 0)`,
+      totalPercent: sql<number>`coalesce(sum(${loopEvents.percent}), 0)`,
       fastestSeconds: sql<number | null>`min(${loopEvents.elapsedSeconds})`,
     })
     .from(users)
     .leftJoin(loopEvents, eq(loopEvents.userId, users.id))
     .groupBy(users.id, users.stravaAthleteId, users.displayName, users.avatarUrl)
-    .orderBy(desc(sql`coalesce(sum(case when ${loopEvents.kind} = 'full' then 1 else 0 end), 0)`));
+    .orderBy(
+      desc(sql`coalesce(sum(case when ${loopEvents.kind} = 'full' then 1 else 0 end), 0)`),
+      desc(sql`coalesce(sum(${loopEvents.percent}), 0)`),
+    );
 
   return rows.map((r) => ({
     userId: r.userId,
@@ -34,6 +40,7 @@ export async function getLeaderboard(): Promise<LeaderboardRow[]> {
     displayName: r.displayName,
     avatarUrl: r.avatarUrl,
     loops: Number(r.loops),
+    totalPercent: Number(r.totalPercent),
     fastestSeconds: r.fastestSeconds == null ? null : Number(r.fastestSeconds),
   }));
 }
@@ -46,6 +53,9 @@ export interface TimelineEvent {
   eventTime: string; // ISO — loop completion
   elapsedSeconds: number | null;
   activityName: string | null;
+  /** Loop position (checkpoint 0-99) where the loop completed; null on rows
+   *  processed before ALGO_VERSION 4. */
+  endP: number | null;
 }
 
 /** Full loop completions with member info, oldest first, for the timeline. */
@@ -59,6 +69,7 @@ export async function getTimeline(): Promise<TimelineEvent[]> {
       eventTime: loopEvents.eventTime,
       elapsedSeconds: loopEvents.elapsedSeconds,
       activityName: activities.name,
+      endP: loopEvents.endP,
     })
     .from(loopEvents)
     .innerJoin(users, eq(users.id, loopEvents.userId))
@@ -74,6 +85,7 @@ export async function getTimeline(): Promise<TimelineEvent[]> {
     eventTime: r.eventTime.toISOString(),
     elapsedSeconds: r.elapsedSeconds,
     activityName: r.activityName,
+    endP: r.endP,
   }));
 }
 

@@ -2,10 +2,18 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { getLeaderboard, getTimeline, formatDuration } from "@/lib/queries";
 import { colorFor } from "@/lib/colors";
-import { Timeline, type TimelineMember } from "./Timeline";
+import { type TimelineMember } from "./Timeline";
 import { Avatar } from "./Avatar";
+import { Board } from "./Board";
+import canonicalJson from "@/loop/canonical-loop.json";
 
 export const dynamic = "force-dynamic";
+
+/** Credited loop travel (full + partial percents) as kilometres. */
+function formatKm(totalPercent: number): string {
+  const km = (totalPercent / 100) * (canonicalJson.totalMeters / 1000);
+  return `${km.toFixed(1)} km`;
+}
 
 export default async function HomePage() {
   const session = await getSession();
@@ -22,7 +30,9 @@ export default async function HomePage() {
     color: colorFor(i),
   }));
 
-  const topLoops = leaderboard[0]?.loops ?? 0;
+  // Bars are scaled to the largest *total* score (full + partial credit),
+  // which can belong to someone other than the loop leader.
+  const maxTotal = Math.max(0, ...leaderboard.map((r) => r.totalPercent));
 
   return (
     <div className="container">
@@ -59,14 +69,20 @@ export default async function HomePage() {
               background: "var(--panel)",
               borderTop: "1px solid #232a36",
               padding: "6px 16px",
+              display: "flex",
+              alignItems: "baseline",
+              justifyContent: "space-between",
             }}
           >
-            Leaderboard
+            <span>Leaderboard</span>
+            <span>Loops</span>
           </h2>
           {leaderboard.map((r, i) => {
-            // The stripe doubles as the relative bar: its background fills
-            // with the member's colour up to loops/topLoops.
-            const pct = topLoops > 0 ? (r.loops / topLoops) * 100 : 0;
+            // The stripe doubles as the relative bar: a brighter section for
+            // full loops, continuing dimmer to the total score incl. partials.
+            const fullPct = maxTotal > 0 ? ((r.loops * 100) / maxTotal) * 100 : 0;
+            const totalPct = maxTotal > 0 ? (r.totalPercent / maxTotal) * 100 : 0;
+            const c = colorFor(i);
             return (
               <div
                 key={r.userId}
@@ -75,7 +91,7 @@ export default async function HomePage() {
                   alignItems: "center",
                   gap: 10,
                   backgroundColor: "var(--panel)",
-                  backgroundImage: `linear-gradient(90deg, ${colorFor(i)}33 ${pct}%, transparent ${pct}%)`,
+                  backgroundImage: `linear-gradient(90deg, ${c}66 ${fullPct}%, ${c}2e ${fullPct}%, ${c}2e ${totalPct}%, transparent ${totalPct}%)`,
                   borderTop: "1px solid #232a36",
                   padding: "8px 16px",
                 }}
@@ -87,14 +103,20 @@ export default async function HomePage() {
                 <span style={{ flex: 1, fontWeight: 500, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {r.displayName}
                 </span>
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ fontVariantNumeric: "tabular-nums", fontSize: 18, fontWeight: 700 }}>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+                  {formatDuration(r.fastestSeconds) ? (
+                    <span style={{ fontSize: 11, color: "var(--muted)" }}>
+                      PR {formatDuration(r.fastestSeconds)} ·
+                    </span>
+                  ) : null}
+                  {r.totalPercent > 0 ? (
+                    <span style={{ fontSize: 11, color: "var(--muted)" }}>
+                      {formatKm(r.totalPercent)} ·
+                    </span>
+                  ) : null}
+                  <span style={{ fontVariantNumeric: "tabular-nums", fontSize: 18, fontWeight: 700 }}>
                     {r.loops}
-                  </div>
-                  <div style={{ fontSize: 11, color: "var(--muted)" }}>
-                    {r.loops === 1 ? "loop" : "loops"}
-                    {formatDuration(r.fastestSeconds) ? ` · PR ${formatDuration(r.fastestSeconds)}` : ""}
-                  </div>
+                  </span>
                 </div>
               </div>
             );
@@ -105,9 +127,7 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section>
-        <Timeline events={timeline} members={members} />
-      </section>
+      <Board events={timeline} members={members} />
     </div>
   );
 }
