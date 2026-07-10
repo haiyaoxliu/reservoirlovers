@@ -33,9 +33,11 @@ export async function GET(req: NextRequest) {
     where: eq(users.stravaAthleteId, athleteId),
   });
 
-  // New athletes must present a valid, unused invite.
+  // New athletes must present a valid, unused invite — except the configured
+  // admin, who can bootstrap the very first account with no invite.
   const inviteCode = store.get("rl_invite")?.value;
-  if (!existing) {
+  const isAdmin = env.adminAthleteId === athleteId;
+  if (!existing && !isAdmin) {
     if (!inviteCode || !(await isInviteValid(inviteCode))) {
       return fail("You need an invite from the club to join");
     }
