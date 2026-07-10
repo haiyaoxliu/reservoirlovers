@@ -5,14 +5,14 @@ import { colorFor } from "@/lib/colors";
 import { type TimelineMember } from "./Timeline";
 import { Avatar } from "./Avatar";
 import { Board } from "./Board";
+import { Distance, HeaderActions } from "./Settings";
 import canonicalJson from "@/loop/canonical-loop.json";
 
 export const dynamic = "force-dynamic";
 
 /** Credited loop travel (full + partial percents) as kilometres. */
-function formatKm(totalPercent: number): string {
-  const km = (totalPercent / 100) * (canonicalJson.totalMeters / 1000);
-  return `${km.toFixed(1)} km`;
+function kmOf(totalPercent: number): number {
+  return (totalPercent / 100) * (canonicalJson.totalMeters / 1000);
 }
 
 export default async function HomePage() {
@@ -38,26 +38,11 @@ export default async function HomePage() {
     <div className="container">
       <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <h1 style={{ fontSize: 26, margin: "8px 0 20px" }}>🏃 Reservoir Lovers</h1>
-        <form action="/api/auth/logout" method="post">
-          <button
-            type="submit"
-            style={{
-              background: "transparent",
-              color: "var(--muted)",
-              border: "1px solid #333c4a",
-              borderRadius: 8,
-              padding: "6px 10px",
-              cursor: "pointer",
-              fontSize: 13,
-            }}
-          >
-            Sign out
-          </button>
-        </form>
+        <HeaderActions />
       </header>
 
       <section style={{ marginBottom: 32 }}>
-        <div className="bleed" style={{ borderBottom: "1px solid #232a36" }}>
+        <div className="bleed" style={{ borderBottom: "1px solid var(--border)" }}>
           <h2
             style={{
               margin: 0,
@@ -67,7 +52,7 @@ export default async function HomePage() {
               textTransform: "uppercase",
               letterSpacing: 1,
               background: "var(--panel)",
-              borderTop: "1px solid #232a36",
+              borderTop: "1px solid var(--border)",
               padding: "6px 16px",
               display: "flex",
               alignItems: "baseline",
@@ -92,7 +77,7 @@ export default async function HomePage() {
                   gap: 10,
                   backgroundColor: "var(--panel)",
                   backgroundImage: `linear-gradient(90deg, ${c}66 ${fullPct}%, ${c}2e ${fullPct}%, ${c}2e ${totalPct}%, transparent ${totalPct}%)`,
-                  borderTop: "1px solid #232a36",
+                  borderTop: "1px solid var(--border)",
                   padding: "8px 16px",
                 }}
               >
@@ -103,18 +88,40 @@ export default async function HomePage() {
                 <span style={{ flex: 1, fontWeight: 500, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {r.displayName}
                 </span>
-                <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-                  {formatDuration(r.fastestSeconds) ? (
-                    <span style={{ fontSize: 11, color: "var(--muted)" }}>
-                      PR {formatDuration(r.fastestSeconds)} ·
-                    </span>
-                  ) : null}
-                  {r.totalPercent > 0 ? (
-                    <span style={{ fontSize: 11, color: "var(--muted)" }}>
-                      {formatKm(r.totalPercent)} ·
-                    </span>
-                  ) : null}
-                  <span style={{ fontVariantNumeric: "tabular-nums", fontSize: 18, fontWeight: 700 }}>
+                {/* Fixed-width right-aligned columns so PR / km / loops line
+                    up vertically across rows. */}
+                <div style={{ display: "flex", alignItems: "baseline" }}>
+                  <span
+                    style={{
+                      width: 66,
+                      textAlign: "right",
+                      fontSize: 11,
+                      color: "var(--muted)",
+                      fontVariantNumeric: "tabular-nums",
+                    }}
+                  >
+                    {formatDuration(r.fastestSeconds) ? `PR ${formatDuration(r.fastestSeconds)}` : ""}
+                  </span>
+                  <span
+                    style={{
+                      width: 62,
+                      textAlign: "right",
+                      fontSize: 11,
+                      color: "var(--muted)",
+                      fontVariantNumeric: "tabular-nums",
+                    }}
+                  >
+                    {r.totalPercent > 0 ? <Distance km={kmOf(r.totalPercent)} /> : ""}
+                  </span>
+                  <span
+                    style={{
+                      width: 40,
+                      textAlign: "right",
+                      fontVariantNumeric: "tabular-nums",
+                      fontSize: 18,
+                      fontWeight: 700,
+                    }}
+                  >
                     {r.loops}
                   </span>
                 </div>
@@ -127,7 +134,13 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <Board events={timeline} members={members} />
+      <Board
+        events={timeline}
+        members={members}
+        currentUserId={
+          leaderboard.find((r) => r.stravaAthleteId === session.athleteId)?.userId ?? null
+        }
+      />
     </div>
   );
 }

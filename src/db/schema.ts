@@ -114,7 +114,6 @@ export const webhookEvents = pgTable(
 export const invites = pgTable("invites", {
   code: text("code").primaryKey(),
   createdBy: bigint("created_by", { mode: "number" }),
-  note: text("note"),
   usedByAthleteId: bigint("used_by_athlete_id", { mode: "number" }),
   usedAt: timestamp("used_at", { withTimezone: true }),
   expiresAt: timestamp("expires_at", { withTimezone: true }),

@@ -15,6 +15,13 @@
       "when": 1783702288924,
       "tag": "0001_nappy_rafael_vega",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1783704259355,
+      "tag": "0002_icy_secret_warriors",
+      "breakpoints": true
     }
   ]
 }

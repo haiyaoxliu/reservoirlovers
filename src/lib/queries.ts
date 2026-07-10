@@ -50,15 +50,20 @@ export interface TimelineEvent {
   userId: number;
   displayName: string;
   avatarUrl: string | null;
+  kind: "full" | "partial";
+  /** 1-100; full events are always 100. */
+  percent: number;
+  direction: string | null; // "ccw" | "cw" | "mixed"
   eventTime: string; // ISO — loop completion
   elapsedSeconds: number | null;
   activityName: string | null;
-  /** Loop position (checkpoint 0-99) where the loop completed; null on rows
+  /** Loop position (checkpoint 0-99) where the event ended; null on rows
    *  processed before ALGO_VERSION 4. */
   endP: number | null;
 }
 
-/** Full loop completions with member info, oldest first, for the timeline. */
+/** All loop events (full + partial) with member info, oldest first. The
+ *  timeline shows only fulls; the map draws both. */
 export async function getTimeline(): Promise<TimelineEvent[]> {
   const rows = await db
     .select({
@@ -66,6 +71,9 @@ export async function getTimeline(): Promise<TimelineEvent[]> {
       userId: loopEvents.userId,
       displayName: users.displayName,
       avatarUrl: users.avatarUrl,
+      kind: loopEvents.kind,
+      percent: loopEvents.percent,
+      direction: loopEvents.direction,
       eventTime: loopEvents.eventTime,
       elapsedSeconds: loopEvents.elapsedSeconds,
       activityName: activities.name,
@@ -74,7 +82,6 @@ export async function getTimeline(): Promise<TimelineEvent[]> {
     .from(loopEvents)
     .innerJoin(users, eq(users.id, loopEvents.userId))
     .innerJoin(activities, eq(activities.id, loopEvents.activityId))
-    .where(eq(loopEvents.kind, "full"))
     .orderBy(asc(loopEvents.eventTime));
 
   return rows.map((r) => ({
@@ -82,6 +89,9 @@ export async function getTimeline(): Promise<TimelineEvent[]> {
     userId: r.userId,
     displayName: r.displayName,
     avatarUrl: r.avatarUrl,
+    kind: r.kind,
+    percent: r.percent,
+    direction: r.direction,
     eventTime: r.eventTime.toISOString(),
     elapsedSeconds: r.elapsedSeconds,
     activityName: r.activityName,

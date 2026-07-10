@@ -6,6 +6,7 @@ import { invites, users } from "@/db/schema";
 import { env } from "@/lib/env";
 import { getSession } from "@/lib/session";
 import { createInvite } from "@/lib/invite";
+import { ExternalLinkIcon } from "../ExternalLinkIcon";
 
 export const dynamic = "force-dynamic";
 
@@ -19,35 +20,32 @@ async function requireAdmin() {
   return user;
 }
 
-async function createInviteAction(formData: FormData) {
+async function createInviteAction() {
   "use server";
   const admin = await requireAdmin();
-  const note = (formData.get("note") as string | null)?.slice(0, 80) || undefined;
-  await createInvite(admin.id, note);
+  await createInvite(admin.id);
   revalidatePath("/admin");
 }
 
 export default async function AdminPage() {
   await requireAdmin();
-  const rows = await db.select().from(invites).orderBy(desc(invites.createdAt)).limit(50);
+  // Attach the Strava account that redeemed each invite.
+  const rows = await db
+    .select({
+      code: invites.code,
+      usedByAthleteId: invites.usedByAthleteId,
+      usedByName: users.displayName,
+    })
+    .from(invites)
+    .leftJoin(users, eq(users.stravaAthleteId, invites.usedByAthleteId))
+    .orderBy(desc(invites.createdAt))
+    .limit(50);
 
   return (
     <div className="container">
       <h1 style={{ fontSize: 22, margin: "8px 0 20px" }}>Invites</h1>
 
-      <form action={createInviteAction} style={{ display: "flex", gap: 8, marginBottom: 24 }}>
-        <input
-          name="note"
-          placeholder="Who's this for? (optional, shown on their invite page)"
-          style={{
-            flex: 1,
-            background: "var(--panel)",
-            border: "1px solid #232a36",
-            borderRadius: 8,
-            color: "var(--text)",
-            padding: "8px 12px",
-          }}
-        />
+      <form action={createInviteAction} style={{ marginBottom: 24 }}>
         <button
           type="submit"
           style={{
@@ -76,15 +74,31 @@ export default async function AdminPage() {
                 alignItems: "center",
                 gap: 12,
                 background: "var(--panel)",
-                border: "1px solid #232a36",
+                border: "1px solid var(--border)",
                 borderRadius: 8,
                 padding: "10px 14px",
-                opacity: used ? 0.5 : 1,
+                opacity: used ? 0.6 : 1,
               }}
             >
               <code style={{ fontSize: 14 }}>{url}</code>
               <span style={{ flex: 1 }} />
-              {inv.note ? <span style={{ color: "var(--muted)", fontSize: 13 }}>{inv.note}</span> : null}
+              {used ? (
+                <a
+                  href={`https://www.strava.com/athletes/${inv.usedByAthleteId}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 5,
+                    color: "var(--text)",
+                    fontSize: 13,
+                  }}
+                >
+                  {inv.usedByName ?? `Athlete ${inv.usedByAthleteId}`}
+                  <ExternalLinkIcon size={11} />
+                </a>
+              ) : null}
               <span style={{ fontSize: 12, color: used ? "#ff6b6b" : "var(--gold)" }}>
                 {used ? "used" : "open"}
               </span>

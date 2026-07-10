@@ -29,25 +29,37 @@ interface Positioned extends TimelineEvent {
   x: number;
 }
 
+/** Floor a timestamp to local midnight. */
+function dayFloor(ms: number): number {
+  const d = new Date(ms);
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+}
+
 export function Timeline({
   events,
   members,
   selected,
   onSelect,
+  mask,
 }: {
   events: TimelineEvent[];
   members: TimelineMember[];
   selected: TimelineEvent | null;
   onSelect: (e: TimelineEvent) => void;
+  /** Time window highlighted over the day columns (the map's clamp). */
+  mask?: { start: number; end: number } | null;
 }) {
+  // The timeline shows full loops only; partial credit lives on the map.
+  const fullEvents = useMemo(() => events.filter((e) => e.kind === "full"), [events]);
+
   // Ordinal axis: one column per calendar day that has at least one loop —
   // empty stretches between run days take up no space at all.
   const { laneEvents, width, ticks, minT } = useMemo(() => {
-    if (events.length === 0) {
+    if (fullEvents.length === 0) {
       return { laneEvents: new Map<number, Positioned[]>(), width: 400, ticks: [], minT: 0 };
     }
     const dayKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-    const sorted = [...events]
+    const sorted = [...fullEvents]
       .map((e) => ({ ...e, t: new Date(e.eventTime).getTime() }))
       .sort((a, b) => a.t - b.t);
 
@@ -97,6 +109,7 @@ export function Timeline({
       const newYear = !prev || prev.getFullYear() !== date.getFullYear();
       const newMonth = newYear || prev!.getMonth() !== date.getMonth();
       return {
+        t: d.t,
         x: colLeft[i],
         w: colWidths[i],
         year: newYear ? String(date.getFullYear()) : null,
@@ -105,9 +118,21 @@ export function Timeline({
       };
     });
     return { laneEvents: byLane, width: acc, ticks: dayTicks, minT: sorted[0].t };
-  }, [events, members]);
+  }, [fullEvents, members]);
 
-  if (events.length === 0) {
+  // Pixel span of the masked window across the day columns.
+  const maskSpan = useMemo(() => {
+    if (!mask) return null;
+    const lo = dayFloor(mask.start);
+    const hi = dayFloor(mask.end);
+    const within = ticks.filter((t) => dayFloor(t.t) >= lo && dayFloor(t.t) <= hi);
+    if (within.length === 0) return null;
+    const left = within[0].x;
+    const right = within[within.length - 1].x + within[within.length - 1].w;
+    return { left, width: right - left };
+  }, [ticks, mask]);
+
+  if (fullEvents.length === 0) {
     return (
       <p style={{ color: "var(--muted)" }}>
         No loops recorded yet. Go run the reservoir and they&apos;ll appear here.
@@ -123,8 +148,8 @@ export function Timeline({
         className="bleed"
         style={{
           display: "flex",
-          borderTop: "1px solid #232a36",
-          borderBottom: "1px solid #232a36",
+          borderTop: "1px solid var(--border)",
+          borderBottom: "1px solid var(--border)",
           background: "var(--panel)",
         }}
       >
@@ -133,7 +158,7 @@ export function Timeline({
             width: LABEL_W,
             flexShrink: 0,
             background: "var(--panel-2)",
-            borderRight: "1px solid #232a36",
+            borderRight: "1px solid var(--border)",
           }}
         >
           {/* Header cell: the section title heads the date-marker stack the
@@ -167,7 +192,7 @@ export function Timeline({
                 display: "flex",
                 alignItems: "center",
                 padding: "0 8px",
-                borderTop: "1px solid #1b212c",
+                borderTop: "1px solid var(--border-soft)",
               }}
             >
               <a
@@ -202,6 +227,22 @@ export function Timeline({
           }}
         >
           <div style={{ position: "relative", width, minWidth: "100%" }}>
+            {/* Sliding highlight marking the window shown on the map */}
+            {maskSpan ? (
+              <div
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  bottom: 0,
+                  left: maskSpan.left,
+                  width: maskSpan.width,
+                  background: "var(--mask)",
+                  pointerEvents: "none",
+                  zIndex: 1,
+                  transition: "left 120ms ease-out, width 120ms ease-out",
+                }}
+              />
+            ) : null}
             <div style={{ position: "relative", height: HEADER_H }}>
             {ticks.map((t, i) => (
               <div
@@ -229,7 +270,7 @@ export function Timeline({
                 <span style={{ height: 15, fontSize: 11, lineHeight: "15px", fontWeight: 600 }}>
                   {t.day}
                 </span>
-                <span style={{ width: 1, height: 4, background: "#333c4a" }} />
+                <span style={{ width: 1, height: 4, background: "var(--border-btn)" }} />
               </div>
             ))}
             </div>
@@ -240,7 +281,7 @@ export function Timeline({
             return (
               <div
                 key={m.userId}
-                style={{ position: "relative", height: LANE_H, borderTop: "1px solid #1b212c" }}
+                style={{ position: "relative", height: LANE_H, borderTop: "1px solid var(--border-soft)" }}
               >
                   {evs.map((e) => (
                     <button
@@ -257,7 +298,7 @@ export function Timeline({
                         padding: 0,
                         cursor: "pointer",
                         background: m.color,
-                        border: `2px solid ${selected?.id === e.id ? "#fff" : m.color}`,
+                        border: `2px solid ${selected?.id === e.id ? "var(--text)" : m.color}`,
                         boxShadow: `0 0 6px ${m.color}66`,
                       }}
                     />

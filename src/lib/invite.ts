@@ -31,8 +31,8 @@ export async function consumeInvite(code: string, athleteId: number): Promise<bo
   return res.length > 0;
 }
 
-export async function createInvite(createdBy: number, note?: string): Promise<string> {
+export async function createInvite(createdBy: number): Promise<string> {
   const code = generateInviteCode();
-  await db.insert(invites).values({ code, createdBy, note });
+  await db.insert(invites).values({ code, createdBy });
   return code;
 }

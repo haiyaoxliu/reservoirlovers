@@ -7,6 +7,25 @@
   --accent: #4aa8ff;
   --water: #2a6fb0;
   --gold: #f5c451;
+  --border: #232a36;
+  --border-soft: #1b212c;
+  --border-btn: #333c4a;
+  --mask: rgba(255, 255, 255, 0.07);
+}
+
+:root[data-theme="light"] {
+  --bg: #f2f5f8;
+  --panel: #ffffff;
+  --panel-2: #e9edf3;
+  --text: #17212e;
+  --muted: #5b6a7d;
+  --accent: #1d7fe0;
+  --water: #2a6fb0;
+  --gold: #a07d1c;
+  --border: #d7dee7;
+  --border-soft: #e4e9ef;
+  --border-btn: #b9c4d0;
+  --mask: rgba(23, 33, 46, 0.07);
 }
 
 * {
