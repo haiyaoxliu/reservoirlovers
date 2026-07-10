@@ -66,7 +66,7 @@ export default async function HomePage() {
               <span style={{ width: 62, textAlign: "right" }}>
                 <DistanceUnit />
               </span>
-              <span style={{ width: 40, textAlign: "right" }}>Loop#</span>
+              <span style={{ width: 40, textAlign: "right" }}>#</span>
             </span>
           </h2>
           {leaderboard.map((r, i) => {
@@ -78,10 +78,22 @@ export default async function HomePage() {
             const fullPct = pctOf(r.exactFullPercent + r.toleranceFullPercent);
             const totalPct = pctOf(r.totalPercent);
             const c = colorFor(i);
+            // Cumulative loop count at each tier boundary; a mark is dropped
+            // when the next one is close enough to overlap it.
+            const fmtLoops = (v: number) => v.toFixed(1).replace(/\.0$/, "");
+            const tierMarks = [
+              { pct: exactPct, label: fmtLoops(r.exactFullPercent / 100) },
+              { pct: fullPct, label: String(r.loops) },
+              { pct: totalPct, label: fmtLoops(r.totalPercent / 100) },
+            ].filter(
+              (mk, idx, arr) =>
+                mk.pct > 0 && (idx === arr.length - 1 || arr[idx + 1].pct - mk.pct > 5),
+            );
             return (
               <div
                 key={r.userId}
                 style={{
+                  position: "relative",
                   display: "flex",
                   alignItems: "center",
                   gap: 10,
@@ -91,6 +103,25 @@ export default async function HomePage() {
                   padding: "8px 16px",
                 }}
               >
+                {tierMarks.map((mk) => (
+                  <span
+                    key={`${mk.pct}-${mk.label}`}
+                    style={{
+                      position: "absolute",
+                      bottom: 1,
+                      left: `${mk.pct}%`,
+                      transform: "translateX(-100%)",
+                      paddingRight: 3,
+                      fontSize: 8.5,
+                      lineHeight: 1,
+                      color: "var(--muted)",
+                      fontVariantNumeric: "tabular-nums",
+                      pointerEvents: "none",
+                    }}
+                  >
+                    {mk.label}
+                  </span>
+                ))}
                 <span style={{ width: 18, color: "var(--muted)", fontVariantNumeric: "tabular-nums" }}>
                   {i + 1}
                 </span>

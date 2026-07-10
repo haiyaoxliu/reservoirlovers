@@ -162,18 +162,43 @@ export function Timeline({
           <span>Timeline</span>
           <span
             style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
               textTransform: "none",
               letterSpacing: 0,
               fontWeight: 400,
               fontSize: 11,
               minWidth: 0,
               overflow: "hidden",
-              textOverflow: "ellipsis",
               whiteSpace: "nowrap",
             }}
           >
-            Swipe left/right · solid dots are full loops, faint dots partial credit · tap for
-            details{minT ? ` · since ${new Date(minT).toLocaleDateString()}` : ""}
+            <span aria-label="swipe left or right">← →</span>
+            <span>·</span>
+            {/* Grayscale legend for the three dot tiers: full, 98%, partial */}
+            {[
+              { opacity: 1, label: "full loop" },
+              { opacity: 0.65, label: "98%+ loop" },
+              { opacity: 0.3, label: "partial credit" },
+            ].map((tier) => (
+              <span
+                key={tier.label}
+                title={tier.label}
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: 4,
+                  background: "var(--muted)",
+                  opacity: tier.opacity,
+                  flexShrink: 0,
+                }}
+              />
+            ))}
+            <span>·</span>
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
+              tap for details{minT ? ` · since ${new Date(minT).toLocaleDateString()}` : ""}
+            </span>
           </span>
         </h2>
 
@@ -297,16 +322,20 @@ export function Timeline({
               >
                   {evs.map((e) => {
                     const full = e.kind === "full";
+                    const exact = full && e.percent >= 100;
                     const r = full ? 7 : 5;
                     const isSel = selected?.id === e.id;
+                    const date = new Date(e.eventTime).toLocaleDateString();
                     return (
                       <button
                         key={e.id}
                         onClick={() => onSelect(e)}
                         title={
                           full
-                            ? `Loop — ${new Date(e.eventTime).toLocaleDateString()}`
-                            : `Partial ${e.percent}% — ${new Date(e.eventTime).toLocaleDateString()}`
+                            ? exact
+                              ? `Loop — ${date}`
+                              : `Loop (${e.percent}%) — ${date}`
+                            : `Partial ${e.percent}% — ${date}`
                         }
                         style={{
                           position: "absolute",
@@ -317,11 +346,12 @@ export function Timeline({
                           borderRadius: r,
                           padding: 0,
                           cursor: "pointer",
-                          // Same prominence split as the map lines: partials
-                          // render dimmer than full loops.
-                          background: full ? m.color : `${m.color}4d`,
+                          // Three tiers like the leaderboard bars: clean 100%
+                          // loops solid, 98-99% tolerance fulls slightly
+                          // dimmer, partials faint.
+                          background: exact ? m.color : full ? `${m.color}b3` : `${m.color}4d`,
                           border: `2px solid ${isSel ? "var(--text)" : full ? m.color : `${m.color}99`}`,
-                          boxShadow: full ? `0 0 6px ${m.color}66` : "none",
+                          boxShadow: exact ? `0 0 6px ${m.color}66` : "none",
                         }}
                       />
                     );

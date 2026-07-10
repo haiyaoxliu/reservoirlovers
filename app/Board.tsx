@@ -239,45 +239,6 @@ export function Board({
           onSelect={setSelected}
           mask={days.length > 0 ? { start: windowStart, end: windowEnd } : null}
         />
-
-        {/* Window picker: slides the map's clamp across the date columns */}
-        {days.length > 0 ? (
-          <div
-            className="bleed"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 12,
-              background: "var(--panel)",
-              borderTop: "1px solid var(--border)",
-              borderBottom: "1px solid var(--border)",
-              padding: "8px 16px",
-              marginTop: 8,
-            }}
-          >
-            <input
-              type="range"
-              min={0}
-              max={maxStartIdx}
-              step={1}
-              value={startIdx}
-              onChange={(ev) => setStartIdx(Number(ev.target.value))}
-              disabled={maxStartIdx === 0}
-              aria-label="Date range shown on the map"
-              style={{ flex: 1 }}
-            />
-            <span
-              style={{
-                fontSize: 11,
-                color: "var(--muted)",
-                whiteSpace: "nowrap",
-                fontVariantNumeric: "tabular-nums",
-              }}
-            >
-              {fmtDay(windowStart)} – {fmtDay(windowEnd)}
-            </span>
-          </div>
-        ) : null}
       </section>
 
       <section>
@@ -292,49 +253,86 @@ export function Board({
             }}
           >
             <span>Map</span>
-            {/* Member visibility toggles, right-aligned in the header. With
-                many members the pills shrink to avatars only. */}
-            <span
-              style={{
-                display: "flex",
-                flexWrap: "wrap",
-                justifyContent: "flex-end",
-                gap: 6,
-                textTransform: "none",
-                letterSpacing: 0,
-              }}
-            >
-              {members.map((m) => {
-                const off = hidden.has(m.userId);
-                const compact = members.length > 5;
-                return (
-                  <button
-                    key={m.userId}
-                    onClick={() => toggle(m.userId)}
-                    aria-pressed={!off}
-                    title={m.displayName}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 6,
-                      background: off ? "transparent" : m.color,
-                      border: `1px solid ${off ? "var(--border-btn)" : m.color}`,
-                      borderRadius: 999,
-                      padding: compact ? 2 : "2px 10px 2px 3px",
-                      color: off ? "var(--muted)" : "#04121f",
-                      fontWeight: off ? 400 : 600,
-                      fontSize: 12,
-                      cursor: "pointer",
-                      opacity: off ? 0.55 : 1,
-                    }}
-                  >
-                    <Avatar url={m.avatarUrl} name={m.displayName} color={m.color} size={20} />
-                    {compact ? null : m.displayName}
-                  </button>
-                );
-              })}
-            </span>
+            {/* Window picker: slides the map's clamp across the date columns */}
+            {days.length > 0 ? (
+              <span
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "flex-end",
+                  gap: 10,
+                  flex: 1,
+                  minWidth: 0,
+                  textTransform: "none",
+                  letterSpacing: 0,
+                }}
+              >
+                <input
+                  type="range"
+                  min={0}
+                  max={maxStartIdx}
+                  step={1}
+                  value={startIdx}
+                  onChange={(ev) => setStartIdx(Number(ev.target.value))}
+                  disabled={maxStartIdx === 0}
+                  aria-label="Date range shown on the map"
+                  style={{ flex: 1, maxWidth: 280, minWidth: 80 }}
+                />
+                <span
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 400,
+                    whiteSpace: "nowrap",
+                    fontVariantNumeric: "tabular-nums",
+                  }}
+                >
+                  {fmtDay(windowStart)} – {fmtDay(windowEnd)}
+                </span>
+              </span>
+            ) : null}
           </h2>
+
+          {/* Member visibility toggles. With many members the pills shrink
+              to avatars only. */}
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 8,
+              padding: "10px 16px",
+              background: "var(--panel)",
+            }}
+          >
+            {members.map((m) => {
+              const off = hidden.has(m.userId);
+              const compact = members.length > 5;
+              return (
+                <button
+                  key={m.userId}
+                  onClick={() => toggle(m.userId)}
+                  aria-pressed={!off}
+                  title={m.displayName}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    background: off ? "transparent" : m.color,
+                    border: `1px solid ${off ? "var(--border-btn)" : m.color}`,
+                    borderRadius: 999,
+                    padding: compact ? 2 : "2px 10px 2px 3px",
+                    color: off ? "var(--muted)" : "#04121f",
+                    fontWeight: off ? 400 : 600,
+                    fontSize: 12,
+                    cursor: "pointer",
+                    opacity: off ? 0.55 : 1,
+                  }}
+                >
+                  <Avatar url={m.avatarUrl} name={m.displayName} color={m.color} size={20} />
+                  {compact ? null : m.displayName}
+                </button>
+              );
+            })}
+          </div>
 
           {/* Just the reservoir: the canonical loop outline, nothing else.
               Flex `order` places the map after the detail strip visually. */}
@@ -356,9 +354,18 @@ export function Board({
               />
               {visibleDrawn.map(({ e, full, d, arrow, sx, sy, color }) => {
                 const isSel = selected?.id === e.id;
-                // Strong hierarchy: fulls bright (80%), partials faint (20%),
-                // the selected event at full colour with a halo underneath.
-                const stroke = isSel ? color : full ? `${color}cc` : `${color}33`;
+                const exact = full && e.percent >= 100;
+                // Three tiers: clean 100% loops bright (80%), 98-99%
+                // tolerance fulls dimmer (65%), partials faint (20%) — the
+                // selected event at full colour with a halo underneath.
+                const stroke = isSel
+                  ? color
+                  : exact
+                    ? `${color}cc`
+                    : full
+                      ? `${color}a6`
+                      : `${color}33`;
+                const markerFill = isSel || exact ? color : full ? `${color}d9` : `${color}66`;
                 const title = `${e.displayName} — ${full ? (e.percent < 100 ? `full loop (${e.percent}%)` : "full loop") : `${e.percent}%`} · ${new Date(e.eventTime).toLocaleDateString()}`;
                 return (
                   <g key={e.id}>
@@ -395,7 +402,7 @@ export function Board({
                     </path>
                     <polygon
                       points={arrow}
-                      fill={full || isSel ? color : `${color}66`}
+                      fill={markerFill}
                       stroke={isSel ? "var(--text)" : "none"}
                       strokeWidth={isSel ? 1.5 : 0}
                       pointerEvents="none"
@@ -404,7 +411,7 @@ export function Board({
                       cx={sx}
                       cy={sy}
                       r={isSel ? (full ? 6 : 4.5) : full ? 5 : 3.5}
-                      fill={full || isSel ? color : `${color}66`}
+                      fill={markerFill}
                       stroke={isSel ? "var(--text)" : "var(--bg)"}
                       strokeWidth={isSel ? 2.5 : 1}
                       style={{ cursor: "pointer" }}
