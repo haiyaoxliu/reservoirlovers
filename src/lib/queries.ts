@@ -62,8 +62,8 @@ export interface TimelineEvent {
   endP: number | null;
 }
 
-/** All loop events (full + partial) with member info, oldest first. The
- *  timeline shows only fulls; the map draws both. */
+/** All loop events (full + partial) with member info, oldest first, for the
+ *  timeline and map. */
 export async function getTimeline(): Promise<TimelineEvent[]> {
   const rows = await db
     .select({

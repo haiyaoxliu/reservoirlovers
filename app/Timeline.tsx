@@ -49,17 +49,14 @@ export function Timeline({
   /** Time window highlighted over the day columns (the map's clamp). */
   mask?: { start: number; end: number } | null;
 }) {
-  // The timeline shows full loops only; partial credit lives on the map.
-  const fullEvents = useMemo(() => events.filter((e) => e.kind === "full"), [events]);
-
   // Ordinal axis: one column per calendar day that has at least one loop —
   // empty stretches between run days take up no space at all.
   const { laneEvents, width, ticks, minT } = useMemo(() => {
-    if (fullEvents.length === 0) {
+    if (events.length === 0) {
       return { laneEvents: new Map<number, Positioned[]>(), width: 400, ticks: [], minT: 0 };
     }
     const dayKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-    const sorted = [...fullEvents]
+    const sorted = [...events]
       .map((e) => ({ ...e, t: new Date(e.eventTime).getTime() }))
       .sort((a, b) => a.t - b.t);
 
@@ -118,7 +115,7 @@ export function Timeline({
       };
     });
     return { laneEvents: byLane, width: acc, ticks: dayTicks, minT: sorted[0].t };
-  }, [fullEvents, members]);
+  }, [events, members]);
 
   // Pixel span of the masked window across the day columns.
   const maskSpan = useMemo(() => {
@@ -132,7 +129,7 @@ export function Timeline({
     return { left, width: right - left };
   }, [ticks, mask]);
 
-  if (fullEvents.length === 0) {
+  if (events.length === 0) {
     return (
       <p style={{ color: "var(--muted)" }}>
         No loops recorded yet. Go run the reservoir and they&apos;ll appear here.
@@ -283,26 +280,37 @@ export function Timeline({
                 key={m.userId}
                 style={{ position: "relative", height: LANE_H, borderTop: "1px solid var(--border-soft)" }}
               >
-                  {evs.map((e) => (
-                    <button
-                      key={e.id}
-                      onClick={() => onSelect(e)}
-                      title={`Loop — ${new Date(e.eventTime).toLocaleDateString()}`}
-                      style={{
-                        position: "absolute",
-                        left: e.x - 7,
-                        top: LANE_H / 2 - 7,
-                        width: 14,
-                        height: 14,
-                        borderRadius: 7,
-                        padding: 0,
-                        cursor: "pointer",
-                        background: m.color,
-                        border: `2px solid ${selected?.id === e.id ? "var(--text)" : m.color}`,
-                        boxShadow: `0 0 6px ${m.color}66`,
-                      }}
-                    />
-                  ))}
+                  {evs.map((e) => {
+                    const full = e.kind === "full";
+                    const r = full ? 7 : 5;
+                    const isSel = selected?.id === e.id;
+                    return (
+                      <button
+                        key={e.id}
+                        onClick={() => onSelect(e)}
+                        title={
+                          full
+                            ? `Loop — ${new Date(e.eventTime).toLocaleDateString()}`
+                            : `Partial ${e.percent}% — ${new Date(e.eventTime).toLocaleDateString()}`
+                        }
+                        style={{
+                          position: "absolute",
+                          left: e.x - r,
+                          top: LANE_H / 2 - r,
+                          width: r * 2,
+                          height: r * 2,
+                          borderRadius: r,
+                          padding: 0,
+                          cursor: "pointer",
+                          // Same prominence split as the map lines: partials
+                          // render dimmer than full loops.
+                          background: full ? m.color : `${m.color}4d`,
+                          border: `2px solid ${isSel ? "var(--text)" : full ? m.color : `${m.color}99`}`,
+                          boxShadow: full ? `0 0 6px ${m.color}66` : "none",
+                        }}
+                      />
+                    );
+                  })}
               </div>
             );
           })}
@@ -311,7 +319,7 @@ export function Timeline({
       </div>
 
       <p style={{ color: "var(--muted)", fontSize: 12, marginTop: 8 }}>
-        Swipe left/right · each dot is one completed loop · tap for details
+        Swipe left/right · solid dots are full loops, faint dots partial credit · tap for details
         {minT ? ` · since ${new Date(minT).toLocaleDateString()}` : ""}
       </p>
     </div>

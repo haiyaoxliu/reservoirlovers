@@ -176,21 +176,27 @@ export function Board({
 
     const drawnEvents = placed.map(({ e, cover, offset, full }) => {
       const pts = cover.map((c) => pointAt(c, offset));
-      const linePts = full ? pts.slice(0, -1) : pts; // ring closes via Z
-      const d =
-        linePts
-          .map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)} ${p.y.toFixed(1)}`)
-          .join(" ") + (full ? " Z" : "");
-      // Arrow tip at the end of travel, oriented along the final step.
       const end = pts[pts.length - 1];
       const prev = pts[pts.length - 2] ?? pts[0];
       const tLen = Math.hypot(end.x - prev.x, end.y - prev.y) || 1;
       const tx = (end.x - prev.x) / tLen;
       const ty = (end.y - prev.y) / tLen;
+
+      // A full loop ends where its start dot sits — stop the line short and
+      // point the arrow tip at the dot instead of overlapping it.
+      const linePts = full
+        ? [...pts.slice(0, -1), { x: end.x - tx * 14, y: end.y - ty * 14 }]
+        : pts;
+      const d = linePts
+        .map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)} ${p.y.toFixed(1)}`)
+        .join(" ");
+      // Arrow tip: just before the dot for fulls, past the last fix for partials.
+      const tipX = full ? end.x - tx * 7 : end.x + tx * 8;
+      const tipY = full ? end.y - ty * 7 : end.y + ty * 8;
       const arrow = [
-        `${(end.x + tx * 8).toFixed(1)},${(end.y + ty * 8).toFixed(1)}`,
-        `${(end.x - tx * 3 - ty * 5).toFixed(1)},${(end.y - ty * 3 + tx * 5).toFixed(1)}`,
-        `${(end.x - tx * 3 + ty * 5).toFixed(1)},${(end.y - ty * 3 - tx * 5).toFixed(1)}`,
+        `${tipX.toFixed(1)},${tipY.toFixed(1)}`,
+        `${(tipX - tx * 11 - ty * 5).toFixed(1)},${(tipY - ty * 11 + tx * 5).toFixed(1)}`,
+        `${(tipX - tx * 11 + ty * 5).toFixed(1)},${(tipY - ty * 11 - tx * 5).toFixed(1)}`,
       ].join(" ");
       return {
         e,
@@ -247,7 +253,7 @@ export function Board({
               type="range"
               min={timeRange.min}
               max={Math.max(timeRange.min, timeRange.max - WINDOW_MS)}
-              step={86400000}
+              step={7 * 86400000}
               value={windowStart}
               onChange={(ev) => setWindowStart(Number(ev.target.value))}
               disabled={timeRange.max - timeRange.min <= WINDOW_MS}
@@ -320,18 +326,19 @@ export function Board({
               role="img"
               aria-label="Central Park Reservoir loop map"
             >
+              {/* Grayscale base so the water shape never competes with
+                  member colours. */}
               <path
                 d={basePath}
-                fill="rgba(42, 111, 176, 0.22)"
-                stroke="var(--water)"
+                fill="var(--mask)"
+                stroke="var(--border-btn)"
                 strokeWidth={4}
                 strokeLinejoin="round"
               />
               {visibleDrawn.map(({ e, full, d, arrow, sx, sy, color }) => {
                 const isSel = selected?.id === e.id;
-                // Same prominence split as the leaderboard bars: full loops
-                // at 40% opacity, partial travel at 18%.
-                const stroke = isSel ? color : full ? `${color}66` : `${color}2e`;
+                // Fulls prominent, partials dimmer (60% vs 30% opacity).
+                const stroke = isSel ? color : full ? `${color}99` : `${color}4d`;
                 const title = `${e.displayName} — ${full ? "full loop" : `${e.percent}%`} · ${new Date(e.eventTime).toLocaleDateString()}`;
                 return (
                   <g key={e.id}>
@@ -357,14 +364,14 @@ export function Board({
                     </path>
                     <polygon
                       points={arrow}
-                      fill={full || isSel ? color : `${color}88`}
+                      fill={full || isSel ? color : `${color}b3`}
                       pointerEvents="none"
                     />
                     <circle
                       cx={sx}
                       cy={sy}
                       r={full ? 5 : 3.5}
-                      fill={full || isSel ? color : `${color}88`}
+                      fill={full || isSel ? color : `${color}b3`}
                       stroke={isSel ? "var(--text)" : "var(--bg)"}
                       strokeWidth={isSel ? 2.5 : 1}
                       style={{ cursor: "pointer" }}
