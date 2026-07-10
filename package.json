@@ -11,11 +11,11 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "build:loop": "tsx scripts/build-canonical-loop.ts",
+    "build:loop": "tsx --env-file-if-exists=.env.local scripts/build-canonical-loop.ts",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "tsx scripts/migrate.ts",
-    "backfill": "tsx scripts/backfill.ts",
-    "webhook:subscribe": "tsx scripts/webhook-subscribe.ts"
+    "db:migrate": "tsx --env-file-if-exists=.env.local scripts/migrate.ts",
+    "backfill": "tsx --env-file-if-exists=.env.local scripts/backfill.ts",
+    "webhook:subscribe": "tsx --env-file-if-exists=.env.local scripts/webhook-subscribe.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.10.4",
