@@ -65,6 +65,8 @@ export interface TimelineEvent {
   eventTime: string; // ISO — loop completion
   elapsedSeconds: number | null;
   activityName: string | null;
+  /** Strava activity id, for linking to the run itself. */
+  stravaActivityId: number;
   /** Loop position (checkpoint 0-99) where the event ended; null on rows
    *  processed before ALGO_VERSION 4. */
   endP: number | null;
@@ -85,6 +87,7 @@ export async function getTimeline(): Promise<TimelineEvent[]> {
       eventTime: loopEvents.eventTime,
       elapsedSeconds: loopEvents.elapsedSeconds,
       activityName: activities.name,
+      stravaActivityId: activities.stravaActivityId,
       endP: loopEvents.endP,
     })
     .from(loopEvents)
@@ -103,6 +106,7 @@ export async function getTimeline(): Promise<TimelineEvent[]> {
     eventTime: r.eventTime.toISOString(),
     elapsedSeconds: r.elapsedSeconds,
     activityName: r.activityName,
+    stravaActivityId: r.stravaActivityId,
     endP: r.endP,
   }));
 }

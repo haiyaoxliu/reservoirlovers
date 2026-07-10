@@ -5,22 +5,28 @@ import { createContext, useContext, useEffect, useState } from "react";
 type Units = "km" | "mi";
 type Theme = "dark" | "light";
 type MapWindow = "normal" | "wide";
+type Display = "detail" | "clean";
 
 const SettingsContext = createContext<{
   units: Units;
   theme: Theme;
   /** How many timeline date columns the map window spans: normal 4, wide 8. */
   mapWindow: MapWindow;
+  /** "clean" hides section headers and secondary text. */
+  display: Display;
   setUnits: (u: Units) => void;
   setTheme: (t: Theme) => void;
   setMapWindow: (w: MapWindow) => void;
+  setDisplay: (d: Display) => void;
 }>({
   units: "km",
   theme: "dark",
   mapWindow: "normal",
+  display: "detail",
   setUnits: () => {},
   setTheme: () => {},
   setMapWindow: () => {},
+  setDisplay: () => {},
 });
 
 export const useSettings = () => useContext(SettingsContext);
@@ -29,6 +35,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [units, setUnitsState] = useState<Units>("km");
   const [theme, setThemeState] = useState<Theme>("dark");
   const [mapWindow, setMapWindowState] = useState<MapWindow>("normal");
+  const [display, setDisplayState] = useState<Display>("detail");
 
   // localStorage is read after mount so the server render (km/dark) hydrates
   // cleanly; the theme itself is applied pre-paint by the inline script in
@@ -38,6 +45,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       if (localStorage.getItem("rl-units") === "mi") setUnitsState("mi");
       if (localStorage.getItem("rl-theme") === "light") setThemeState("light");
       if (localStorage.getItem("rl-map-window") === "wide") setMapWindowState("wide");
+      if (localStorage.getItem("rl-display") === "clean") setDisplayState("clean");
     } catch {}
   }, []);
 
@@ -60,12 +68,27 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem("rl-map-window", w);
     } catch {}
   };
+  const setDisplay = (d: Display) => {
+    setDisplayState(d);
+    try {
+      localStorage.setItem("rl-display", d);
+    } catch {}
+  };
 
   return (
-    <SettingsContext.Provider value={{ units, theme, mapWindow, setUnits, setTheme, setMapWindow }}>
+    <SettingsContext.Provider
+      value={{ units, theme, mapWindow, display, setUnits, setTheme, setMapWindow, setDisplay }}
+    >
       {children}
     </SettingsContext.Provider>
   );
+}
+
+/** Renders children only in "detail" display mode — for section headers and
+ *  other secondary chrome that "clean" hides. */
+export function DetailOnly({ children }: { children: React.ReactNode }) {
+  const { display } = useSettings();
+  return display === "detail" ? <>{children}</> : null;
 }
 
 const KM_PER_MI = 1.609344;
@@ -181,7 +204,8 @@ function Segmented<T extends string>({
 /** Header buttons: settings gear (opens the modal) and sign-out. */
 export function HeaderActions() {
   const [open, setOpen] = useState(false);
-  const { units, theme, mapWindow, setUnits, setTheme, setMapWindow } = useSettings();
+  const { units, theme, mapWindow, display, setUnits, setTheme, setMapWindow, setDisplay } =
+    useSettings();
 
   return (
     <div style={{ display: "flex", gap: 8 }}>
@@ -263,6 +287,7 @@ export function HeaderActions() {
                 alignItems: "center",
                 justifyContent: "space-between",
                 gap: 16,
+                marginBottom: 12,
               }}
             >
               <span style={{ fontSize: 14 }}>Map window</span>
@@ -273,6 +298,24 @@ export function HeaderActions() {
                   { v: "wide", label: "Wide" },
                 ]}
                 onChange={setMapWindow}
+              />
+            </div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 16,
+              }}
+            >
+              <span style={{ fontSize: 14 }}>Display</span>
+              <Segmented
+                value={display}
+                options={[
+                  { v: "detail", label: "Detail" },
+                  { v: "clean", label: "Clean" },
+                ]}
+                onChange={setDisplay}
               />
             </div>
             <button

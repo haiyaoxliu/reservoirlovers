@@ -1,9 +1,25 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import type { TimelineEvent } from "@/lib/queries";
 import { ExternalLinkIcon } from "./ExternalLinkIcon";
 import { Avatar } from "./Avatar";
+import { DetailOnly } from "./Settings";
+
+/** Strava's chevron mark, tinted to the site's muted grayscale. */
+function StravaIcon({ size = 12 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden="true"
+    >
+      <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169" />
+    </svg>
+  );
+}
 
 export interface TimelineMember {
   userId: number;
@@ -117,6 +133,17 @@ export function Timeline({
     return { laneEvents: byLane, width: acc, ticks: dayTicks, minT: sorted[0].t };
   }, [events, members]);
 
+  // Bring the selected dot into view (e.g. when stepping with prev/next or
+  // tapping on the map).
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const selectedId = selected?.id;
+  useEffect(() => {
+    if (selectedId == null) return;
+    scrollRef.current
+      ?.querySelector(`[data-eid="${selectedId}"]`)
+      ?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+  }, [selectedId]);
+
   // Pixel span of the masked window across the day columns.
   const maskSpan = useMemo(() => {
     if (!mask) return null;
@@ -141,6 +168,7 @@ export function Timeline({
     <div style={{ position: "relative" }}>
       <div className="bleed">
         {/* Section header, matching the leaderboard's — help text right-aligned */}
+        <DetailOnly>
         <h2
           style={{
             margin: 0,
@@ -176,21 +204,33 @@ export function Timeline({
           >
             <span aria-label="swipe left or right">← →</span>
             <span>·</span>
-            {/* Grayscale legend for the three dot tiers: full, 98%, partial */}
+            {/* Grayscale legend for the three dot tiers, mirroring the real
+                dots' fill/border pattern: full solid, 98%+ dimmed fill with
+                solid border, partial faint fill with faint border. */}
             {[
-              { opacity: 1, label: "full loop" },
-              { opacity: 0.65, label: "98%+ loop" },
-              { opacity: 0.3, label: "partial credit" },
+              { label: "full loop", size: 10, bg: "var(--muted)", border: "var(--muted)" },
+              {
+                label: "98%+ loop",
+                size: 10,
+                bg: "color-mix(in srgb, var(--muted) 70%, transparent)",
+                border: "var(--muted)",
+              },
+              {
+                label: "partial credit",
+                size: 8,
+                bg: "color-mix(in srgb, var(--muted) 30%, transparent)",
+                border: "color-mix(in srgb, var(--muted) 60%, transparent)",
+              },
             ].map((tier) => (
               <span
                 key={tier.label}
                 title={tier.label}
                 style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: 4,
-                  background: "var(--muted)",
-                  opacity: tier.opacity,
+                  width: tier.size,
+                  height: tier.size,
+                  borderRadius: tier.size / 2,
+                  background: tier.bg,
+                  border: `2px solid ${tier.border}`,
                   flexShrink: 0,
                 }}
               />
@@ -201,6 +241,7 @@ export function Timeline({
             </span>
           </span>
         </h2>
+        </DetailOnly>
 
         {/* The rail lives OUTSIDE the scroll container so the elastic overscroll
             bounce at the data's end only moves the dots/markers, never the rail. */}
@@ -219,8 +260,23 @@ export function Timeline({
             borderRight: "1px solid var(--border)",
           }}
         >
-          {/* Empty corner cell keeps the date-marker stack aligned with lanes */}
-          <div style={{ height: HEADER_H }} />
+          {/* Corner cell: Strava mark + down arrow — the avatars below link
+              to Strava profiles */}
+          <div
+            style={{
+              height: HEADER_H,
+              display: "flex",
+              alignItems: "flex-end",
+              justifyContent: "center",
+              gap: 3,
+              paddingBottom: 6,
+              color: "var(--muted)",
+            }}
+            title="Avatars link to Strava profiles"
+          >
+            <StravaIcon />
+            <span style={{ fontSize: 10, lineHeight: "12px" }}>↓</span>
+          </div>
           {members.map((m) => (
             <div
               key={m.userId}
@@ -255,6 +311,7 @@ export function Timeline({
         </div>
 
         <div
+          ref={scrollRef}
           style={{
             flex: 1,
             minWidth: 0,
@@ -329,6 +386,7 @@ export function Timeline({
                     return (
                       <button
                         key={e.id}
+                        data-eid={e.id}
                         onClick={() => onSelect(e)}
                         title={
                           full

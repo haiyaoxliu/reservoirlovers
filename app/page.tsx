@@ -5,7 +5,8 @@ import { colorFor } from "@/lib/colors";
 import { type TimelineMember } from "./Timeline";
 import { Avatar } from "./Avatar";
 import { Board } from "./Board";
-import { Distance, DistanceUnit, HeaderActions } from "./Settings";
+import { DetailOnly, Distance, DistanceUnit, HeaderActions } from "./Settings";
+import { TierMarks } from "./TierMarks";
 import canonicalJson from "@/loop/canonical-loop.json";
 
 export const dynamic = "force-dynamic";
@@ -43,6 +44,7 @@ export default async function HomePage() {
 
       <section style={{ marginBottom: 32 }}>
         <div className="bleed" style={{ borderBottom: "1px solid var(--border)" }}>
+          <DetailOnly>
           <h2
             style={{
               margin: 0,
@@ -69,6 +71,7 @@ export default async function HomePage() {
               <span style={{ width: 40, textAlign: "right" }}>#</span>
             </span>
           </h2>
+          </DetailOnly>
           {leaderboard.map((r, i) => {
             // The stripe doubles as the relative bar, in three opacity tiers:
             // clean 100% loops (brightest) → 98-99% tolerance fulls (slightly
@@ -78,17 +81,14 @@ export default async function HomePage() {
             const fullPct = pctOf(r.exactFullPercent + r.toleranceFullPercent);
             const totalPct = pctOf(r.totalPercent);
             const c = colorFor(i);
-            // Cumulative loop count at each tier boundary; a mark is dropped
-            // when the next one is close enough to overlap it.
+            // Cumulative loop count at each tier boundary (TierMarks handles
+            // overlap-dropping and detail/clean sizing).
             const fmtLoops = (v: number) => v.toFixed(1).replace(/\.0$/, "");
             const tierMarks = [
               { pct: exactPct, label: fmtLoops(r.exactFullPercent / 100) },
               { pct: fullPct, label: String(r.loops) },
               { pct: totalPct, label: fmtLoops(r.totalPercent / 100) },
-            ].filter(
-              (mk, idx, arr) =>
-                mk.pct > 0 && (idx === arr.length - 1 || arr[idx + 1].pct - mk.pct > 5),
-            );
+            ];
             return (
               <div
                 key={r.userId}
@@ -103,25 +103,7 @@ export default async function HomePage() {
                   padding: "8px 16px",
                 }}
               >
-                {tierMarks.map((mk) => (
-                  <span
-                    key={`${mk.pct}-${mk.label}`}
-                    style={{
-                      position: "absolute",
-                      bottom: 1,
-                      left: `${mk.pct}%`,
-                      transform: "translateX(-100%)",
-                      paddingRight: 3,
-                      fontSize: 8.5,
-                      lineHeight: 1,
-                      color: "var(--muted)",
-                      fontVariantNumeric: "tabular-nums",
-                      pointerEvents: "none",
-                    }}
-                  >
-                    {mk.label}
-                  </span>
-                ))}
+                <TierMarks marks={tierMarks} />
                 <span style={{ width: 18, color: "var(--muted)", fontVariantNumeric: "tabular-nums" }}>
                   {i + 1}
                 </span>
@@ -130,7 +112,9 @@ export default async function HomePage() {
                   {r.displayName}
                 </span>
                 {/* Fixed-width right-aligned columns so PR / km / loops line
-                    up vertically across rows. */}
+                    up vertically across rows; hidden entirely in clean mode
+                    (the watermark tier counts carry the numbers there). */}
+                <DetailOnly>
                 <div style={{ display: "flex", alignItems: "baseline" }}>
                   <span
                     style={{
@@ -166,6 +150,7 @@ export default async function HomePage() {
                     {r.loops}
                   </span>
                 </div>
+                </DetailOnly>
               </div>
             );
           })}

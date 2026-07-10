@@ -3,10 +3,10 @@
 import { useMemo, useState } from "react";
 import type { TimelineEvent } from "@/lib/queries";
 import { formatDuration } from "@/lib/queries";
-import { Timeline, stravaProfileUrl, type TimelineMember } from "./Timeline";
+import { Timeline, type TimelineMember } from "./Timeline";
 import { Avatar } from "./Avatar";
 import { ExternalLinkIcon } from "./ExternalLinkIcon";
-import { Distance, useSettings } from "./Settings";
+import { DetailOnly, Distance, useSettings } from "./Settings";
 import canonicalJson from "@/loop/canonical-loop.json";
 
 const MAP_PAD_M = 30;
@@ -89,7 +89,7 @@ export function Board({
     for (const e of events) set.add(dayFloor(new Date(e.eventTime).getTime()));
     return [...set].sort((a, b) => a - b);
   }, [events]);
-  const { mapWindow } = useSettings();
+  const { mapWindow, display } = useSettings();
   const windowDays = mapWindow === "wide" ? 8 : 4;
   const maxStartIdx = Math.max(0, days.length - windowDays);
   const [startIdxRaw, setStartIdx] = useState<number | null>(null);
@@ -103,6 +103,33 @@ export function Board({
       return d >= windowStart && d <= windowEnd;
     });
   }, [events, windowStart, windowEnd]);
+
+  // Select an event: slide the window to cover its day if needed (centred
+  // when possible), and un-hide the member on the map so it's visible.
+  const selectEvent = (e: TimelineEvent) => {
+    setSelected(e);
+    const idx = days.indexOf(dayFloor(new Date(e.eventTime).getTime()));
+    if (idx >= 0 && (idx < startIdx || idx > startIdx + windowDays - 1)) {
+      setStartIdx(Math.max(0, Math.min(idx - Math.floor(windowDays / 2), maxStartIdx)));
+    }
+    setHidden((prev) => {
+      if (!prev.has(e.userId)) return prev;
+      const next = new Set(prev);
+      next.delete(e.userId);
+      return next;
+    });
+  };
+
+  // Prev/next within the selected member's own event sequence (oldest first).
+  const { prevEvent, nextEvent } = useMemo(() => {
+    if (!selected) return { prevEvent: null, nextEvent: null };
+    const own = events.filter((ev) => ev.userId === selected.userId);
+    const pos = own.findIndex((ev) => ev.id === selected.id);
+    return {
+      prevEvent: pos > 0 ? own[pos - 1] : null,
+      nextEvent: pos >= 0 && pos < own.length - 1 ? own[pos + 1] : null,
+    };
+  }, [events, selected]);
 
   // SVG geometry: checkpoint coords are meters east/north of the reservoir
   // centroid, so meters map 1:1 to SVG units with the y axis flipped. Every
@@ -236,103 +263,106 @@ export function Board({
           events={events}
           members={members}
           selected={selected}
-          onSelect={setSelected}
+          onSelect={selectEvent}
           mask={days.length > 0 ? { start: windowStart, end: windowEnd } : null}
         />
       </section>
 
       <section>
         <div className="bleed" style={{ display: "flex", flexDirection: "column" }}>
-          <h2
-            style={{
-              ...headerStyle,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 12,
-            }}
-          >
-            <span>Map</span>
-            {/* Window picker: slides the map's clamp across the date columns */}
-            {days.length > 0 ? (
+          {/* Header (hidden in clean mode) carries the member toggles, so
+              they hide with it; the slider row below always stays. */}
+          <DetailOnly>
+            <h2
+              style={{
+                ...headerStyle,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 12,
+              }}
+            >
+              <span>Map</span>
               <span
                 style={{
                   display: "flex",
-                  alignItems: "center",
+                  flexWrap: "wrap",
                   justifyContent: "flex-end",
-                  gap: 10,
-                  flex: 1,
-                  minWidth: 0,
+                  gap: 6,
                   textTransform: "none",
                   letterSpacing: 0,
                 }}
               >
-                <input
-                  type="range"
-                  min={0}
-                  max={maxStartIdx}
-                  step={1}
-                  value={startIdx}
-                  onChange={(ev) => setStartIdx(Number(ev.target.value))}
-                  disabled={maxStartIdx === 0}
-                  aria-label="Date range shown on the map"
-                  style={{ flex: 1, maxWidth: 280, minWidth: 80 }}
-                />
+                {members.map((m) => {
+                  const off = hidden.has(m.userId);
+                  const compact = members.length > 5;
+                  return (
+                    <button
+                      key={m.userId}
+                      onClick={() => toggle(m.userId)}
+                      aria-pressed={!off}
+                      title={m.displayName}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                        background: off ? "transparent" : m.color,
+                        border: `1px solid ${off ? "var(--border-btn)" : m.color}`,
+                        borderRadius: 999,
+                        padding: compact ? 2 : "2px 10px 2px 3px",
+                        color: off ? "var(--muted)" : "#04121f",
+                        fontWeight: off ? 400 : 600,
+                        fontSize: 12,
+                        cursor: "pointer",
+                        opacity: off ? 0.55 : 1,
+                      }}
+                    >
+                      <Avatar url={m.avatarUrl} name={m.displayName} color={m.color} size={20} />
+                      {compact ? null : m.displayName}
+                    </button>
+                  );
+                })}
+              </span>
+            </h2>
+          </DetailOnly>
+
+          {/* Window picker: slides the map's clamp across the date columns */}
+          {days.length > 0 ? (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                padding: "8px 16px",
+                background: "var(--panel)",
+                borderBottom: "1px solid var(--border)",
+              }}
+            >
+              <input
+                type="range"
+                min={0}
+                max={maxStartIdx}
+                step={1}
+                value={startIdx}
+                onChange={(ev) => setStartIdx(Number(ev.target.value))}
+                disabled={maxStartIdx === 0}
+                aria-label="Date range shown on the map"
+                style={{ flex: 1 }}
+              />
+              {display === "detail" ? (
                 <span
                   style={{
                     fontSize: 11,
-                    fontWeight: 400,
+                    color: "var(--muted)",
                     whiteSpace: "nowrap",
                     fontVariantNumeric: "tabular-nums",
                   }}
                 >
                   {fmtDay(windowStart)} – {fmtDay(windowEnd)}
                 </span>
-              </span>
-            ) : null}
-          </h2>
-
-          {/* Member visibility toggles. With many members the pills shrink
-              to avatars only. */}
-          <div
-            style={{
-              display: "flex",
-              flexWrap: "wrap",
-              gap: 8,
-              padding: "10px 16px",
-              background: "var(--panel)",
-            }}
-          >
-            {members.map((m) => {
-              const off = hidden.has(m.userId);
-              const compact = members.length > 5;
-              return (
-                <button
-                  key={m.userId}
-                  onClick={() => toggle(m.userId)}
-                  aria-pressed={!off}
-                  title={m.displayName}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    background: off ? "transparent" : m.color,
-                    border: `1px solid ${off ? "var(--border-btn)" : m.color}`,
-                    borderRadius: 999,
-                    padding: compact ? 2 : "2px 10px 2px 3px",
-                    color: off ? "var(--muted)" : "#04121f",
-                    fontWeight: off ? 400 : 600,
-                    fontSize: 12,
-                    cursor: "pointer",
-                    opacity: off ? 0.55 : 1,
-                  }}
-                >
-                  <Avatar url={m.avatarUrl} name={m.displayName} color={m.color} size={20} />
-                  {compact ? null : m.displayName}
-                </button>
-              );
-            })}
-          </div>
+              ) : null}
+            </div>
+          ) : null}
 
           {/* Just the reservoir: the canonical loop outline, nothing else.
               Flex `order` places the map after the detail strip visually. */}
@@ -396,7 +426,7 @@ export function Board({
                       strokeWidth={14}
                       style={{ cursor: "pointer" }}
                       pointerEvents="stroke"
-                      onClick={() => setSelected(e)}
+                      onClick={() => selectEvent(e)}
                     >
                       <title>{title}</title>
                     </path>
@@ -415,7 +445,7 @@ export function Board({
                       stroke={isSel ? "var(--text)" : "var(--bg)"}
                       strokeWidth={isSel ? 2.5 : 1}
                       style={{ cursor: "pointer" }}
-                      onClick={() => setSelected(e)}
+                      onClick={() => selectEvent(e)}
                     >
                       <title>{title}</title>
                     </circle>
@@ -445,61 +475,96 @@ export function Board({
                 />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-                    {selectedMember ? (
-                      <a
-                        href={stravaProfileUrl(selectedMember.stravaAthleteId)}
-                        target="_blank"
-                        rel="noreferrer"
-                        style={{
-                          color: "inherit",
-                          fontWeight: 600,
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 6,
-                        }}
-                      >
-                        {selected.displayName}
-                        <ExternalLinkIcon size={11} />
-                      </a>
-                    ) : (
-                      <span style={{ fontWeight: 600 }}>{selected.displayName}</span>
-                    )}
-                    {selected.kind === "full" ? (
-                      <span style={{ color: selectedMember?.color ?? "var(--accent)", fontWeight: 600 }}>
-                        {[
+                    <span style={{ fontWeight: 600 }}>{selected.displayName}</span>
+                    {/* The stat links to the Strava activity itself */}
+                    <a
+                      href={`https://www.strava.com/activities/${selected.stravaActivityId}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 5,
+                        color:
+                          selected.kind === "full"
+                            ? (selectedMember?.color ?? "var(--accent)")
+                            : "var(--muted)",
+                        fontWeight: selected.kind === "full" ? 600 : 400,
+                        fontSize: selected.kind === "full" ? undefined : 13,
+                      }}
+                    >
+                      {selected.kind === "full" ? (
+                        [
                           formatDuration(selected.elapsedSeconds),
                           selected.percent < 100 ? `${selected.percent}%` : null,
                         ]
                           .filter(Boolean)
-                          .join(" · ")}
-                      </span>
-                    ) : null}
-                    {selected.kind === "partial" ? (
-                      <span style={{ color: "var(--muted)", fontSize: 13 }}>
-                        partial · {selected.percent}% (
-                        <Distance km={((selected.percent / 100) * loop.totalMeters) / 1000} />)
-                      </span>
-                    ) : null}
+                          .join(" · ")
+                      ) : (
+                        <>
+                          partial · {selected.percent}% (
+                          <Distance km={((selected.percent / 100) * loop.totalMeters) / 1000} />)
+                        </>
+                      )}
+                      <ExternalLinkIcon size={11} />
+                    </a>
                   </div>
-                  <div
-                    style={{
-                      color: "var(--muted)",
-                      fontSize: 12,
-                      whiteSpace: "nowrap",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                    }}
-                  >
-                    {new Date(selected.eventTime).toLocaleString("en-US", {
-                      weekday: "short",
-                      month: "short",
-                      day: "numeric",
-                      hour: "numeric",
-                      minute: "2-digit",
-                    })}
-                    {selected.activityName ? ` · ${selected.activityName}` : ""}
-                  </div>
+                  {display === "detail" ? (
+                    <div
+                      style={{
+                        color: "var(--muted)",
+                        fontSize: 12,
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
+                    >
+                      {new Date(selected.eventTime).toLocaleString("en-US", {
+                        weekday: "short",
+                        month: "short",
+                        day: "numeric",
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })}
+                      {selected.activityName ? ` · ${selected.activityName}` : ""}
+                    </div>
+                  ) : null}
                 </div>
+                {/* Step through this member's events in timeline order */}
+                <button
+                  onClick={() => prevEvent && selectEvent(prevEvent)}
+                  disabled={!prevEvent}
+                  aria-label="Previous loop"
+                  style={{
+                    background: "transparent",
+                    color: prevEvent ? "var(--text)" : "var(--muted)",
+                    border: "1px solid var(--border-btn)",
+                    borderRadius: 8,
+                    padding: "4px 10px",
+                    cursor: prevEvent ? "pointer" : "default",
+                    fontSize: 13,
+                    opacity: prevEvent ? 1 : 0.4,
+                  }}
+                >
+                  ‹
+                </button>
+                <button
+                  onClick={() => nextEvent && selectEvent(nextEvent)}
+                  disabled={!nextEvent}
+                  aria-label="Next loop"
+                  style={{
+                    background: "transparent",
+                    color: nextEvent ? "var(--text)" : "var(--muted)",
+                    border: "1px solid var(--border-btn)",
+                    borderRadius: 8,
+                    padding: "4px 10px",
+                    cursor: nextEvent ? "pointer" : "default",
+                    fontSize: 13,
+                    opacity: nextEvent ? 1 : 0.4,
+                  }}
+                >
+                  ›
+                </button>
                 <button
                   onClick={() => setSelected(null)}
                   aria-label="Clear selection"
