@@ -33,7 +33,8 @@ export function stravaProfileUrl(athleteId: number): string {
 }
 
 const LANE_H = 46;
-const LABEL_W = 72;
+/** Rail width matches lane height so member cells are square. */
+const LABEL_W = 46;
 const HEADER_H = 46;
 /** Horizontal spacing between same-day dots in one lane. */
 const DOT_SPACING = 16;

@@ -6,7 +6,7 @@ import { type TimelineMember } from "./Timeline";
 import { Avatar } from "./Avatar";
 import { Board } from "./Board";
 import { DetailOnly, Distance, DistanceUnit, HeaderActions } from "./Settings";
-import { TierMarks } from "./TierMarks";
+import { LeaderboardRow, MemberName } from "./LeaderboardRow";
 import canonicalJson from "@/loop/canonical-loop.json";
 
 export const dynamic = "force-dynamic";
@@ -62,111 +62,90 @@ export default async function HomePage() {
             }}
           >
             <span>Leaderboard</span>
-            {/* Column headers, matching the row column widths below */}
-            <span style={{ display: "flex", alignItems: "baseline" }}>
-              <span style={{ width: 66, textAlign: "right" }}>PR</span>
-              <span style={{ width: 62, textAlign: "right" }}>
-                <DistanceUnit />
+            {/* Column headers, matching the row column widths below; they
+                hide together with the stat columns. */}
+            <DetailOnly pref="statColumns">
+              <span style={{ display: "flex", alignItems: "baseline" }}>
+                <span style={{ width: 66, textAlign: "right" }}>PR</span>
+                <span style={{ width: 62, textAlign: "right" }}>
+                  <DistanceUnit />
+                </span>
+                <span style={{ width: 40, textAlign: "right" }}>#</span>
               </span>
-              <span style={{ width: 40, textAlign: "right" }}>#</span>
-            </span>
+            </DetailOnly>
           </h2>
           </DetailOnly>
           {leaderboard.map((r, i) => {
             // The stripe doubles as the relative bar, in three opacity tiers:
             // clean 100% loops (brightest) → 98-99% tolerance fulls (slightly
             // dimmer) → partial credit (faint), out to the total score.
-            // Every bar starts with a fixed pad of the full-loop colour wide
-            // enough for the name (and rank, in detail view) to sit on; real
-            // values scale into the remaining width.
-            const BAR_PAD_PCT = 28;
-            const pctOf = (v: number) =>
-              BAR_PAD_PCT + (maxTotal > 0 ? (v / maxTotal) * (100 - BAR_PAD_PCT) : 0);
-            const exactPct = pctOf(r.exactFullPercent);
-            const fullPct = pctOf(r.exactFullPercent + r.toleranceFullPercent);
-            const totalPct = pctOf(r.totalPercent);
-            const c = colorFor(i);
-            // Cumulative loop count at each tier boundary (TierMarks handles
-            // overlap-dropping and sizing). The main count always shows.
-            const fmtLoops = (v: number) => v.toFixed(1).replace(/\.0$/, "");
-            const tierMarks = [
-              ...(r.exactFullPercent > 0
-                ? [{ pct: exactPct, label: fmtLoops(r.exactFullPercent / 100) }]
-                : []),
-              { pct: fullPct, label: String(r.loops), main: true },
-              ...(r.totalPercent > 0
-                ? [{ pct: totalPct, label: fmtLoops(r.totalPercent / 100) }]
-                : []),
-            ];
             return (
-              <div
+              <LeaderboardRow
                 key={r.userId}
-                className="lb-row"
-                style={{
-                  position: "relative",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  backgroundColor: "var(--panel)",
-                  backgroundImage: `linear-gradient(90deg, ${c}66 ${exactPct}%, ${c}59 ${exactPct}%, ${c}59 ${fullPct}%, ${c}2e ${fullPct}%, ${c}2e ${totalPct}%, transparent ${totalPct}%)`,
-                  borderTop: "1px solid var(--border)",
-                  padding: "8px 16px",
-                }}
+                color={colorFor(i)}
+                maxTotal={maxTotal}
+                exactFullPercent={r.exactFullPercent}
+                toleranceFullPercent={r.toleranceFullPercent}
+                totalPercent={r.totalPercent}
+                loops={r.loops}
+                stats={
+                  /* Fixed-width right-aligned columns in their own section
+                     right of the bar; hidden with the column headers. */
+                  <DetailOnly pref="statColumns">
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        padding: "0 16px 0 8px",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "baseline" }}>
+                        <span
+                          style={{
+                            width: 66,
+                            textAlign: "right",
+                            fontSize: 11,
+                            color: "var(--muted)",
+                            fontVariantNumeric: "tabular-nums",
+                          }}
+                        >
+                          {formatDuration(r.fastestSeconds) ?? ""}
+                        </span>
+                        <span
+                          style={{
+                            width: 62,
+                            textAlign: "right",
+                            fontSize: 11,
+                            color: "var(--muted)",
+                            fontVariantNumeric: "tabular-nums",
+                          }}
+                        >
+                          {r.totalPercent > 0 ? <Distance km={kmOf(r.totalPercent)} bare /> : ""}
+                        </span>
+                        <span
+                          style={{
+                            width: 40,
+                            textAlign: "right",
+                            fontVariantNumeric: "tabular-nums",
+                            fontSize: 18,
+                            fontWeight: 700,
+                          }}
+                        >
+                          {r.loops}
+                        </span>
+                      </div>
+                    </div>
+                  </DetailOnly>
+                }
               >
-                <TierMarks marks={tierMarks} />
                 <DetailOnly pref="rowChrome">
                   <span style={{ width: 18, color: "var(--muted)", fontVariantNumeric: "tabular-nums" }}>
                     {i + 1}
                   </span>
                   <Avatar url={r.avatarUrl} name={r.displayName} color={colorFor(i)} />
                 </DetailOnly>
-                <span
-                  className="lb-name"
-                  style={{ flex: 1, fontWeight: 500, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-                >
-                  {r.displayName}
-                </span>
-                {/* Fixed-width right-aligned columns so PR / km / loops line
-                    up vertically across rows; when hidden, the watermark tier
-                    counts carry the numbers. */}
-                <DetailOnly pref="statColumns">
-                <div style={{ display: "flex", alignItems: "baseline" }}>
-                  <span
-                    style={{
-                      width: 66,
-                      textAlign: "right",
-                      fontSize: 11,
-                      color: "var(--muted)",
-                      fontVariantNumeric: "tabular-nums",
-                    }}
-                  >
-                    {formatDuration(r.fastestSeconds) ?? ""}
-                  </span>
-                  <span
-                    style={{
-                      width: 62,
-                      textAlign: "right",
-                      fontSize: 11,
-                      color: "var(--muted)",
-                      fontVariantNumeric: "tabular-nums",
-                    }}
-                  >
-                    {r.totalPercent > 0 ? <Distance km={kmOf(r.totalPercent)} bare /> : ""}
-                  </span>
-                  <span
-                    style={{
-                      width: 40,
-                      textAlign: "right",
-                      fontVariantNumeric: "tabular-nums",
-                      fontSize: 18,
-                      fontWeight: 700,
-                    }}
-                  >
-                    {r.loops}
-                  </span>
-                </div>
-                </DetailOnly>
-              </div>
+                <MemberName name={r.displayName} />
+              </LeaderboardRow>
             );
           })}
           {leaderboard.length === 0 ? (
