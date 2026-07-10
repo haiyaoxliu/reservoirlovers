@@ -4,11 +4,13 @@ import { useMemo, useState } from "react";
 import type { TimelineEvent } from "@/lib/queries";
 import { formatDuration } from "@/lib/queries";
 import { ExternalLinkIcon } from "./ExternalLinkIcon";
+import { Avatar } from "./Avatar";
 
 export interface TimelineMember {
   userId: number;
   stravaAthleteId: number;
   displayName: string;
+  avatarUrl: string | null;
   color: string;
 }
 
@@ -17,7 +19,8 @@ function stravaProfileUrl(athleteId: number): string {
 }
 
 const LANE_H = 46;
-const LABEL_W = 100;
+const LABEL_W = 72;
+const HEADER_H = 46;
 /** Horizontal spacing between same-day dots in one lane. */
 const DOT_SPACING = 16;
 const MIN_COL_W = 44;
@@ -135,9 +138,37 @@ export function Timeline({
         }}
       >
         <div style={{ position: "relative", width: LABEL_W + width, minWidth: "100%" }}>
-          {/* Day markers — one per column, i.e. only where there is data.
-              Stacked year / month / day; year and month print on change. */}
-          <div style={{ position: "relative", height: 46, marginLeft: LABEL_W }}>
+          {/* Header row: the section title heads the date-marker stack the
+              same way member avatars head the dot lanes below. */}
+          <div style={{ position: "relative", height: HEADER_H }}>
+            <div
+              style={{
+                position: "sticky",
+                left: 0,
+                zIndex: 2,
+                width: LABEL_W,
+                height: HEADER_H,
+                display: "flex",
+                alignItems: "flex-end",
+                padding: "0 8px 6px",
+                background: "var(--panel-2)",
+                borderRight: "1px solid #232a36",
+              }}
+            >
+              <h2
+                style={{
+                  margin: 0,
+                  fontSize: 10,
+                  fontWeight: 600,
+                  color: "var(--muted)",
+                  textTransform: "uppercase",
+                  letterSpacing: 1,
+                }}
+              >
+                Timeline
+              </h2>
+            </div>
+            <div style={{ position: "absolute", top: 0, left: LABEL_W, right: 0, height: HEADER_H }}>
             {ticks.map((t, i) => (
               <div
                 key={i}
@@ -146,7 +177,7 @@ export function Timeline({
                   left: t.x,
                   width: t.w,
                   top: 0,
-                  height: 46,
+                  height: HEADER_H,
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "center",
@@ -167,6 +198,7 @@ export function Timeline({
                 <span style={{ width: 1, height: 4, background: "#333c4a" }} />
               </div>
             ))}
+            </div>
           </div>
 
           {/* Lanes */}
@@ -192,26 +224,22 @@ export function Timeline({
                     borderRight: "1px solid #232a36",
                   }}
                 >
-                  <span
-                    style={{ width: 10, height: 10, borderRadius: 5, background: m.color, flexShrink: 0 }}
-                  />
                   <a
                     href={stravaProfileUrl(m.stravaAthleteId)}
                     target="_blank"
                     rel="noreferrer"
+                    aria-label={`${m.displayName} on Strava`}
+                    title={m.displayName}
                     style={{
                       flex: 1,
-                      minWidth: 0,
                       display: "flex",
                       alignItems: "center",
+                      justifyContent: "space-between",
                       gap: 6,
                       color: "inherit",
-                      fontSize: 13,
                     }}
                   >
-                    <span style={{ flex: 1, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {m.displayName}
-                    </span>
+                    <Avatar url={m.avatarUrl} name={m.displayName} color={m.color} />
                     <ExternalLinkIcon size={11} />
                   </a>
                 </div>

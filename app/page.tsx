@@ -4,7 +4,6 @@ import { getLeaderboard, getTimeline, formatDuration } from "@/lib/queries";
 import { colorFor } from "@/lib/colors";
 import { Timeline, type TimelineMember } from "./Timeline";
 import { Avatar } from "./Avatar";
-import { ExternalLinkIcon } from "./ExternalLinkIcon";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +18,7 @@ export default async function HomePage() {
     userId: r.userId,
     stravaAthleteId: r.stravaAthleteId,
     displayName: r.displayName,
+    avatarUrl: r.avatarUrl,
     color: colorFor(i),
   }));
 
@@ -47,10 +47,22 @@ export default async function HomePage() {
       </header>
 
       <section style={{ marginBottom: 32 }}>
-        <h2 style={{ fontSize: 15, color: "var(--muted)", textTransform: "uppercase", letterSpacing: 1 }}>
-          Leaderboard
-        </h2>
-        <div className="bleed" style={{ marginTop: 12, borderBottom: "1px solid #232a36" }}>
+        <div className="bleed" style={{ borderBottom: "1px solid #232a36" }}>
+          <h2
+            style={{
+              margin: 0,
+              fontSize: 12,
+              fontWeight: 600,
+              color: "var(--muted)",
+              textTransform: "uppercase",
+              letterSpacing: 1,
+              background: "var(--panel)",
+              borderTop: "1px solid #232a36",
+              padding: "6px 16px",
+            }}
+          >
+            Leaderboard
+          </h2>
           {leaderboard.map((r, i) => {
             // The stripe doubles as the relative bar: its background fills
             // with the member's colour up to loops/topLoops.
@@ -72,27 +84,9 @@ export default async function HomePage() {
                   {i + 1}
                 </span>
                 <Avatar url={r.avatarUrl} name={r.displayName} color={colorFor(i)} />
-                <a
-                  href={`https://www.strava.com/athletes/${r.stravaAthleteId}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  style={{
-                    flex: 1,
-                    minWidth: 0,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    color: "inherit",
-                    fontWeight: 500,
-                  }}
-                >
-                  {/* Name shrinks/truncates; the icon stays pinned at the end
-                      of the column so it lines up across rows. */}
-                  <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {r.displayName}
-                  </span>
-                  <ExternalLinkIcon />
-                </a>
+                <span style={{ flex: 1, fontWeight: 500, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {r.displayName}
+                </span>
                 <div style={{ textAlign: "right" }}>
                   <div style={{ fontVariantNumeric: "tabular-nums", fontSize: 18, fontWeight: 700 }}>
                     {r.loops}
@@ -112,9 +106,6 @@ export default async function HomePage() {
       </section>
 
       <section>
-        <h2 style={{ fontSize: 15, color: "var(--muted)", textTransform: "uppercase", letterSpacing: 1, marginBottom: 12 }}>
-          Timeline
-        </h2>
         <Timeline events={timeline} members={members} />
       </section>
     </div>
