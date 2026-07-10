@@ -7,6 +7,7 @@ import { env } from "@/lib/env";
 import { getSession } from "@/lib/session";
 import { createInvite } from "@/lib/invite";
 import { ExternalLinkIcon } from "../ExternalLinkIcon";
+import { CopyButton } from "../CopyButton";
 
 export const dynamic = "force-dynamic";
 
@@ -72,16 +73,28 @@ export default async function AdminPage() {
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 12,
+                gap: 10,
                 background: "var(--panel)",
                 border: "1px solid var(--border)",
                 borderRadius: 8,
-                padding: "10px 14px",
+                padding: "8px 12px",
                 opacity: used ? 0.6 : 1,
               }}
             >
-              <code style={{ fontSize: 14 }}>{url}</code>
-              <span style={{ flex: 1 }} />
+              {/* Truncates on narrow screens; the copy button carries the
+                  full link */}
+              <code
+                style={{
+                  fontSize: 13,
+                  flex: 1,
+                  minWidth: 0,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {url}
+              </code>
               {used ? (
                 <a
                   href={`https://www.strava.com/athletes/${inv.usedByAthleteId}`}
@@ -93,13 +106,23 @@ export default async function AdminPage() {
                     gap: 5,
                     color: "var(--text)",
                     fontSize: 13,
+                    whiteSpace: "nowrap",
+                    flexShrink: 0,
                   }}
                 >
                   {inv.usedByName ?? `Athlete ${inv.usedByAthleteId}`}
                   <ExternalLinkIcon size={11} />
                 </a>
-              ) : null}
-              <span style={{ fontSize: 12, color: used ? "#ff6b6b" : "var(--gold)" }}>
+              ) : (
+                <CopyButton text={url} />
+              )}
+              <span
+                style={{
+                  fontSize: 12,
+                  color: used ? "#ff6b6b" : "var(--gold)",
+                  flexShrink: 0,
+                }}
+              >
                 {used ? "used" : "open"}
               </span>
             </div>

@@ -80,7 +80,7 @@ export function Board({
     return [...set].sort((a, b) => a - b);
   }, [events]);
   const { mapWindow, prefs } = useSettings();
-  const windowDays = mapWindow === "wide" ? 8 : 4;
+  const windowDays = mapWindow === "all" ? Math.max(1, days.length) : mapWindow === "wide" ? 8 : 4;
   const maxStartIdx = Math.max(0, days.length - windowDays);
   const [startIdxRaw, setStartIdx] = useState<number | null>(null);
   const startIdx = Math.min(startIdxRaw ?? maxStartIdx, maxStartIdx);

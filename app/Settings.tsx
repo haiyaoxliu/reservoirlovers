@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 
 type Units = "km" | "mi";
 type Theme = "dark" | "light";
-type MapWindow = "normal" | "wide";
+type MapWindow = "normal" | "wide" | "all";
 
 /** Individually toggleable pieces of secondary chrome. All default to shown. */
 export interface DetailPrefs {
@@ -70,7 +70,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     try {
       if (localStorage.getItem("rl-units") === "mi") setUnitsState("mi");
       if (localStorage.getItem("rl-theme") === "light") setThemeState("light");
-      if (localStorage.getItem("rl-map-window") === "wide") setMapWindowState("wide");
+      const win = localStorage.getItem("rl-map-window");
+      if (win === "wide" || win === "all") setMapWindowState(win);
       const stored = JSON.parse(localStorage.getItem("rl-detail") ?? "{}");
       setPrefsState({ ...DEFAULT_PREFS, ...stored });
     } catch {}
@@ -181,6 +182,25 @@ function LogoutIcon({ size = 16 }: { size?: number }) {
       <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
       <polyline points="16 17 21 12 16 7" />
       <line x1="21" y1="12" x2="9" y2="12" />
+    </svg>
+  );
+}
+
+/** Key glyph for the admin (invites) page. */
+function KeyIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m3 3L22 7l-3-3m-3.5 3.5L19 4" />
     </svg>
   );
 }
@@ -349,8 +369,9 @@ const DETAIL_TOGGLES: { key: keyof DetailPrefs; label: string }[] = [
   { key: "userHighlight", label: "User highlight" },
 ];
 
-/** Header buttons: detail visibility controls, settings, and sign-out. */
-export function HeaderActions() {
+/** Header buttons: admin invites (admins only), settings, and sign-out. The
+ *  detail-visibility button is hidden for now; its modal code remains. */
+export function HeaderActions({ isAdmin = false }: { isAdmin?: boolean }) {
   const [openSettings, setOpenSettings] = useState(false);
   const [openDetail, setOpenDetail] = useState(false);
   const { units, theme, mapWindow, prefs, setUnits, setTheme, setMapWindow, setPref } =
@@ -358,14 +379,21 @@ export function HeaderActions() {
 
   return (
     <div style={{ display: "flex", gap: 8 }}>
-      <button
-        aria-label="Detail visibility"
-        title="Detail visibility"
-        onClick={() => setOpenDetail(true)}
-        style={iconButtonStyle}
-      >
-        <SlidersIcon />
-      </button>
+      {isAdmin ? (
+        <a aria-label="Invites" title="Invites" href="/admin" style={iconButtonStyle}>
+          <KeyIcon />
+        </a>
+      ) : null}
+      {false ? (
+        <button
+          aria-label="Detail visibility"
+          title="Detail visibility"
+          onClick={() => setOpenDetail(true)}
+          style={iconButtonStyle}
+        >
+          <SlidersIcon />
+        </button>
+      ) : null}
       <button
         aria-label="Settings"
         title="Settings"
@@ -444,6 +472,7 @@ export function HeaderActions() {
               options={[
                 { v: "normal", label: "Normal" },
                 { v: "wide", label: "Wide" },
+                { v: "all", label: "All" },
               ]}
               onChange={setMapWindow}
             />

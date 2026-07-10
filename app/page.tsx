@@ -39,7 +39,11 @@ export default async function HomePage() {
     <div className="container">
       <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <h1 style={{ fontSize: 26, margin: "8px 0 20px" }}>🏃 Reservoir Lovers</h1>
-        <HeaderActions />
+        <HeaderActions
+          isAdmin={
+            leaderboard.find((r) => r.stravaAthleteId === session.athleteId)?.isAdmin ?? false
+          }
+        />
       </header>
 
       <section style={{ marginBottom: 32 }}>
