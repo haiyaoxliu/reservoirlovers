@@ -27,10 +27,8 @@ export function MemberName({ name }: { name: string }) {
 }
 
 /**
- * A leaderboard stripe whose background is the three-tier relative bar. The
- * bar starts with a pad in the full-loop colour sized to what sits on it —
- * wide for full names, narrow for initials — with a thin marker where the
- * pad ends and real data begins.
+ * A leaderboard stripe whose background is the three-tier relative bar,
+ * starting at the row's left edge with true proportions.
  */
 export function LeaderboardRow({
   color,
@@ -53,9 +51,7 @@ export function LeaderboardRow({
   stats?: React.ReactNode;
   children: React.ReactNode;
 }) {
-  const { prefs } = useSettings();
-  const pad = prefs.rowChrome ? 28 : 12;
-  const pctOf = (v: number) => pad + (maxTotal > 0 ? (v / maxTotal) * (100 - pad) : 0);
+  const pctOf = (v: number) => (maxTotal > 0 ? (v / maxTotal) * 100 : 0);
   const exactPct = pctOf(exactFullPercent);
   const fullPct = pctOf(exactFullPercent + toleranceFullPercent);
   const totalPct = pctOf(totalPercent);
@@ -64,10 +60,9 @@ export function LeaderboardRow({
   const marks = [
     ...(exactFullPercent > 0 ? [{ pct: exactPct, label: fmtLoops(exactFullPercent / 100) }] : []),
     { pct: fullPct, label: String(loops), main: true },
-    // The grand total renders in every view; only omitted when it would just
-    // duplicate the main count (no partial credit at all).
+    // Omitted only when it would just duplicate the main count.
     ...(totalPercent > fullSum
-      ? [{ pct: totalPct, label: fmtLoops(totalPercent / 100), always: true }]
+      ? [{ pct: totalPct, label: fmtLoops(totalPercent / 100) }]
       : []),
   ];
 
@@ -89,9 +84,7 @@ export function LeaderboardRow({
           display: "flex",
           alignItems: "center",
           gap: 10,
-          // The pad renders brighter than the exact-full tier so where real
-          // data begins stays visible.
-          backgroundImage: `linear-gradient(90deg, ${color}8c ${pad}%, ${color}66 ${pad}%, ${color}66 ${exactPct}%, ${color}59 ${exactPct}%, ${color}59 ${fullPct}%, ${color}2e ${fullPct}%, ${color}2e ${totalPct}%, transparent ${totalPct}%)`,
+          backgroundImage: `linear-gradient(90deg, ${color}66 ${exactPct}%, ${color}59 ${exactPct}%, ${color}59 ${fullPct}%, ${color}2e ${fullPct}%, ${color}2e ${totalPct}%, transparent ${totalPct}%)`,
           padding: "8px 8px 8px 16px",
         }}
       >
