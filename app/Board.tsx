@@ -6,12 +6,10 @@ import { formatDuration } from "@/lib/queries";
 import { Timeline, stravaProfileUrl, type TimelineMember } from "./Timeline";
 import { Avatar } from "./Avatar";
 import { ExternalLinkIcon } from "./ExternalLinkIcon";
-import { Distance } from "./Settings";
+import { Distance, useSettings } from "./Settings";
 import canonicalJson from "@/loop/canonical-loop.json";
 
 const MAP_PAD_M = 30;
-/** The map shows a sliding window of this length, picked below the timeline. */
-const WINDOW_MS = 30 * 86400000;
 /** First travel line sits this far outside the water's edge. */
 const BASE_OFF_M = 12;
 /** Radial distance between an event's ring level and the next. */
@@ -82,24 +80,27 @@ export function Board({
     return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
   };
 
-  // Sliding 1-month window; the map only draws events inside it. Defaults to
-  // the most recent month of data.
-  const timeRange = useMemo(() => {
-    if (events.length === 0) return null;
-    const ts = events.map((e) => new Date(e.eventTime).getTime());
-    return { min: Math.min(...ts), max: Math.max(...ts) };
+  // The window slides over the timeline's own date columns (days that have
+  // at least one event), showing up to WINDOW_DAYS columns at a time on the
+  // map. Indexing columns rather than wall-clock time keeps the slider and
+  // the mask perfectly in step. Defaults to the most recent columns.
+  const days = useMemo(() => {
+    const set = new Set<number>();
+    for (const e of events) set.add(dayFloor(new Date(e.eventTime).getTime()));
+    return [...set].sort((a, b) => a - b);
   }, [events]);
-  const [windowStartRaw, setWindowStart] = useState<number | null>(null);
-  const windowStart =
-    windowStartRaw ?? (timeRange ? Math.max(timeRange.min, timeRange.max - WINDOW_MS) : 0);
-  const windowEnd = windowStart + WINDOW_MS;
+  const { mapWindow } = useSettings();
+  const windowDays = mapWindow === "wide" ? 8 : 4;
+  const maxStartIdx = Math.max(0, days.length - windowDays);
+  const [startIdxRaw, setStartIdx] = useState<number | null>(null);
+  const startIdx = Math.min(startIdxRaw ?? maxStartIdx, maxStartIdx);
+  const windowStart = days[startIdx] ?? 0;
+  const windowEnd = days[Math.min(startIdx + windowDays, days.length) - 1] ?? 0;
 
   const mapEvents = useMemo(() => {
-    const lo = dayFloor(windowStart);
-    const hi = dayFloor(windowEnd);
     return events.filter((e) => {
       const d = dayFloor(new Date(e.eventTime).getTime());
-      return d >= lo && d <= hi;
+      return d >= windowStart && d <= windowEnd;
     });
   }, [events, windowStart, windowEnd]);
 
@@ -231,11 +232,11 @@ export function Board({
           members={members}
           selected={selected}
           onSelect={setSelected}
-          mask={timeRange ? { start: windowStart, end: windowEnd } : null}
+          mask={days.length > 0 ? { start: windowStart, end: windowEnd } : null}
         />
 
-        {/* Window picker: slides the 1-month clamp shown on the map */}
-        {timeRange ? (
+        {/* Window picker: slides the map's clamp across the date columns */}
+        {days.length > 0 ? (
           <div
             className="bleed"
             style={{
@@ -251,13 +252,13 @@ export function Board({
           >
             <input
               type="range"
-              min={timeRange.min}
-              max={Math.max(timeRange.min, timeRange.max - WINDOW_MS)}
-              step={7 * 86400000}
-              value={windowStart}
-              onChange={(ev) => setWindowStart(Number(ev.target.value))}
-              disabled={timeRange.max - timeRange.min <= WINDOW_MS}
-              aria-label="Month shown on the map"
+              min={0}
+              max={maxStartIdx}
+              step={1}
+              value={startIdx}
+              onChange={(ev) => setStartIdx(Number(ev.target.value))}
+              disabled={maxStartIdx === 0}
+              aria-label="Date range shown on the map"
               style={{ flex: 1 }}
             />
             <span

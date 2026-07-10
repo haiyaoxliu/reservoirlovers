@@ -4,19 +4,31 @@ import { createContext, useContext, useEffect, useState } from "react";
 
 type Units = "km" | "mi";
 type Theme = "dark" | "light";
+type MapWindow = "normal" | "wide";
 
 const SettingsContext = createContext<{
   units: Units;
   theme: Theme;
+  /** How many timeline date columns the map window spans: normal 4, wide 8. */
+  mapWindow: MapWindow;
   setUnits: (u: Units) => void;
   setTheme: (t: Theme) => void;
-}>({ units: "km", theme: "dark", setUnits: () => {}, setTheme: () => {} });
+  setMapWindow: (w: MapWindow) => void;
+}>({
+  units: "km",
+  theme: "dark",
+  mapWindow: "normal",
+  setUnits: () => {},
+  setTheme: () => {},
+  setMapWindow: () => {},
+});
 
 export const useSettings = () => useContext(SettingsContext);
 
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [units, setUnitsState] = useState<Units>("km");
   const [theme, setThemeState] = useState<Theme>("dark");
+  const [mapWindow, setMapWindowState] = useState<MapWindow>("normal");
 
   // localStorage is read after mount so the server render (km/dark) hydrates
   // cleanly; the theme itself is applied pre-paint by the inline script in
@@ -25,6 +37,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     try {
       if (localStorage.getItem("rl-units") === "mi") setUnitsState("mi");
       if (localStorage.getItem("rl-theme") === "light") setThemeState("light");
+      if (localStorage.getItem("rl-map-window") === "wide") setMapWindowState("wide");
     } catch {}
   }, []);
 
@@ -41,9 +54,15 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem("rl-theme", t);
     } catch {}
   };
+  const setMapWindow = (w: MapWindow) => {
+    setMapWindowState(w);
+    try {
+      localStorage.setItem("rl-map-window", w);
+    } catch {}
+  };
 
   return (
-    <SettingsContext.Provider value={{ units, theme, setUnits, setTheme }}>
+    <SettingsContext.Provider value={{ units, theme, mapWindow, setUnits, setTheme, setMapWindow }}>
       {children}
     </SettingsContext.Provider>
   );
@@ -154,7 +173,7 @@ function Segmented<T extends string>({
 /** Header buttons: settings gear (opens the modal) and sign-out. */
 export function HeaderActions() {
   const [open, setOpen] = useState(false);
-  const { units, theme, setUnits, setTheme } = useSettings();
+  const { units, theme, mapWindow, setUnits, setTheme, setMapWindow } = useSettings();
 
   return (
     <div style={{ display: "flex", gap: 8 }}>
@@ -217,6 +236,7 @@ export function HeaderActions() {
                 alignItems: "center",
                 justifyContent: "space-between",
                 gap: 16,
+                marginBottom: 12,
               }}
             >
               <span style={{ fontSize: 14 }}>Theme</span>
@@ -227,6 +247,24 @@ export function HeaderActions() {
                   { v: "light", label: "Light" },
                 ]}
                 onChange={setTheme}
+              />
+            </div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 16,
+              }}
+            >
+              <span style={{ fontSize: 14 }}>Map window</span>
+              <Segmented
+                value={mapWindow}
+                options={[
+                  { v: "normal", label: "Normal" },
+                  { v: "wide", label: "Wide" },
+                ]}
+                onChange={setMapWindow}
               />
             </div>
             <button
