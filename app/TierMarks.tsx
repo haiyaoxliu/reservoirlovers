@@ -1,5 +1,7 @@
 "use client";
 
+import { useSettings } from "./Settings";
+
 export interface TierMark {
   /** Boundary position as a percentage of the bar width. */
   pct: number;
@@ -10,13 +12,18 @@ export interface TierMark {
 }
 
 /**
- * Loop counts tucked into the bottom-right corner of their bar segment, in
- * every display mode. A number that would overlap another flips to the right
- * side of its boundary; if it doesn't fit there either, it disappears.
+ * Loop counts anchored to their bar segment's boundary. With the stat
+ * columns shown they're small bottom-right corner text; with them hidden the
+ * numbers grow to full-height watermarks. Either way the same placement rule
+ * applies — a number that would overlap another flips to the right side of
+ * its boundary, and disappears if it doesn't fit there either — with the
+ * growth ceiling (estimated text width) scaled to the font.
  */
 export function TierMarks({ marks }: { marks: TierMark[] }) {
-  // Estimated text width as % of a ~350px bar (8.5px font ≈ 5px per char).
-  const widthOf = (m: TierMark) => m.label.length * 1.5 + 0.5;
+  const { prefs } = useSettings();
+  const clean = !prefs.statColumns;
+  // Estimated text width as % of a ~350px bar (5px/char small, 13px large).
+  const widthOf = (m: TierMark) => m.label.length * (clean ? 3.6 : 1.5) + 0.5;
 
   const overlaps = (a: [number, number], b: [number, number]) => a[0] < b[1] && b[0] < a[1];
 
@@ -47,17 +54,29 @@ export function TierMarks({ marks }: { marks: TierMark[] }) {
           key={`${mk.pct}-${mk.label}`}
           style={{
             position: "absolute",
-            bottom: 1,
             left: `${mk.pct}%`,
             transform: left ? undefined : "translateX(-100%)",
-            paddingRight: left ? 0 : 3,
-            paddingLeft: left ? 3 : 0,
-            fontSize: 8.5,
-            lineHeight: 1,
+            paddingRight: left ? 0 : clean ? 5 : 3,
+            paddingLeft: left ? (clean ? 5 : 3) : 0,
             color: mk.main ? "var(--text)" : "var(--muted)",
-            opacity: mk.main ? 0.8 : 1,
             fontVariantNumeric: "tabular-nums",
             pointerEvents: "none",
+            ...(clean
+              ? {
+                  top: 0,
+                  bottom: 0,
+                  display: "flex",
+                  alignItems: "center",
+                  fontSize: 24,
+                  fontWeight: 700,
+                  opacity: mk.main ? 0.55 : 0.4,
+                }
+              : {
+                  bottom: 1,
+                  fontSize: 8.5,
+                  lineHeight: 1,
+                  opacity: mk.main ? 0.8 : 1,
+                }),
           }}
         >
           {mk.label}
