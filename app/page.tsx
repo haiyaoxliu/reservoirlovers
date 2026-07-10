@@ -3,6 +3,7 @@ import { getSession } from "@/lib/session";
 import { getLeaderboard, getTimeline, formatDuration } from "@/lib/queries";
 import { colorFor } from "@/lib/colors";
 import { Timeline, type TimelineMember } from "./Timeline";
+import { Avatar } from "./Avatar";
 
 export const dynamic = "force-dynamic";
 
@@ -67,10 +68,7 @@ export default async function HomePage() {
               <span
                 style={{ width: 12, height: 12, borderRadius: 6, background: colorFor(i), flexShrink: 0 }}
               />
-              {r.avatarUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={r.avatarUrl} alt="" width={28} height={28} style={{ borderRadius: 14 }} />
-              ) : null}
+              <Avatar url={r.avatarUrl} name={r.displayName} color={colorFor(i)} />
               <span style={{ flex: 1, fontWeight: 500 }}>{r.displayName}</span>
               <div style={{ textAlign: "right" }}>
                 <div style={{ fontVariantNumeric: "tabular-nums", fontSize: 18, fontWeight: 700 }}>

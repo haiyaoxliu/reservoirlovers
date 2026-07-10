@@ -38,7 +38,7 @@ export default async function AdminPage() {
       <form action={createInviteAction} style={{ display: "flex", gap: 8, marginBottom: 24 }}>
         <input
           name="note"
-          placeholder="Who's this for? (optional)"
+          placeholder="Who's this for? (optional, shown on their invite page)"
           style={{
             flex: 1,
             background: "var(--panel)",

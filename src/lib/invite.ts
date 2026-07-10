@@ -8,12 +8,17 @@ export function generateInviteCode(): string {
   return randomBytes(6).toString("base64url").slice(0, 8);
 }
 
+/** The invite row if the code exists, is unused, and is not expired; else null. */
+export async function getValidInvite(code: string) {
+  const row = await db.query.invites.findFirst({ where: eq(invites.code, code) });
+  if (!row || row.usedByAthleteId) return null;
+  if (row.expiresAt && row.expiresAt.getTime() < Date.now()) return null;
+  return row;
+}
+
 /** True if the code exists, is unused, and is not expired. */
 export async function isInviteValid(code: string): Promise<boolean> {
-  const row = await db.query.invites.findFirst({ where: eq(invites.code, code) });
-  if (!row || row.usedByAthleteId) return false;
-  if (row.expiresAt && row.expiresAt.getTime() < Date.now()) return false;
-  return true;
+  return (await getValidInvite(code)) !== null;
 }
 
 /** Atomically consume an invite for an athlete. Returns false if already used. */
