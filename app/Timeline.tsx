@@ -6,8 +6,13 @@ import { formatDuration } from "@/lib/queries";
 
 export interface TimelineMember {
   userId: number;
+  stravaAthleteId: number;
   displayName: string;
   color: string;
+}
+
+function stravaProfileUrl(athleteId: number): string {
+  return `https://www.strava.com/athletes/${athleteId}`;
 }
 
 const LANE_H = 46;
@@ -80,17 +85,18 @@ export function Timeline({
       byLane.get(e.userId)?.push({ ...e, x });
     }
 
+    // Year/month rows only print when they change; the day row always does.
     const dayTicks = days.map((d, i) => {
       const date = new Date(d.t);
       const prev = i > 0 ? new Date(days[i - 1].t) : null;
-      const newMonth =
-        !prev || prev.getMonth() !== date.getMonth() || prev.getFullYear() !== date.getFullYear();
+      const newYear = !prev || prev.getFullYear() !== date.getFullYear();
+      const newMonth = newYear || prev!.getMonth() !== date.getMonth();
       return {
         x: colLeft[i],
         w: colWidths[i],
-        label: newMonth
-          ? date.toLocaleDateString("en-US", { month: "short", day: "numeric" })
-          : String(date.getDate()),
+        year: newYear ? String(date.getFullYear()) : null,
+        month: newMonth ? date.toLocaleDateString("en-US", { month: "short" }) : null,
+        day: String(date.getDate()),
       };
     });
     return { laneEvents: byLane, width: acc, ticks: dayTicks, minT: sorted[0].t };
@@ -99,6 +105,11 @@ export function Timeline({
   const colorOf = useMemo(() => {
     const m = new Map(members.map((x) => [x.userId, x.color]));
     return (id: number) => m.get(id) ?? "#888";
+  }, [members]);
+
+  const athleteOf = useMemo(() => {
+    const m = new Map(members.map((x) => [x.userId, x.stravaAthleteId]));
+    return (id: number) => m.get(id);
   }, [members]);
 
   if (events.length === 0) {
@@ -123,8 +134,9 @@ export function Timeline({
         }}
       >
         <div style={{ position: "relative", width: LABEL_W + width, minWidth: "100%" }}>
-          {/* Day markers — one per column, i.e. only where there is data */}
-          <div style={{ position: "relative", height: 24, marginLeft: LABEL_W }}>
+          {/* Day markers — one per column, i.e. only where there is data.
+              Stacked year / month / day; year and month print on change. */}
+          <div style={{ position: "relative", height: 46, marginLeft: LABEL_W }}>
             {ticks.map((t, i) => (
               <div
                 key={i}
@@ -133,18 +145,24 @@ export function Timeline({
                   left: t.x,
                   width: t.w,
                   top: 0,
-                  height: 24,
+                  height: 46,
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "center",
                   justifyContent: "flex-end",
-                  fontSize: 10,
-                  color: "var(--muted)",
                   whiteSpace: "nowrap",
                   overflow: "hidden",
                 }}
               >
-                <span style={{ paddingBottom: 1 }}>{t.label}</span>
+                <span style={{ height: 12, fontSize: 9, lineHeight: "12px", color: "var(--muted)" }}>
+                  {t.year}
+                </span>
+                <span style={{ height: 13, fontSize: 10, lineHeight: "13px", color: "var(--muted)" }}>
+                  {t.month}
+                </span>
+                <span style={{ height: 15, fontSize: 11, lineHeight: "15px", fontWeight: 600 }}>
+                  {t.day}
+                </span>
                 <span style={{ width: 1, height: 4, background: "#333c4a" }} />
               </div>
             ))}
@@ -176,8 +194,12 @@ export function Timeline({
                   <span
                     style={{ width: 10, height: 10, borderRadius: 5, background: m.color, flexShrink: 0 }}
                   />
-                  <span
+                  <a
+                    href={stravaProfileUrl(m.stravaAthleteId)}
+                    target="_blank"
+                    rel="noreferrer"
                     style={{
+                      color: "inherit",
                       fontSize: 13,
                       whiteSpace: "nowrap",
                       overflow: "hidden",
@@ -185,7 +207,7 @@ export function Timeline({
                     }}
                   >
                     {m.displayName}
-                  </span>
+                  </a>
                 </div>
 
                 <div style={{ position: "absolute", top: 0, left: LABEL_W, right: 0, height: LANE_H }}>
@@ -240,7 +262,20 @@ export function Timeline({
               maxWidth: 320,
             }}
           >
-            <div style={{ fontWeight: 600, marginBottom: 6 }}>{selected.displayName}</div>
+            <div style={{ fontWeight: 600, marginBottom: 6 }}>
+              {athleteOf(selected.userId) ? (
+                <a
+                  href={stravaProfileUrl(athleteOf(selected.userId)!)}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ color: "inherit" }}
+                >
+                  {selected.displayName}
+                </a>
+              ) : (
+                selected.displayName
+              )}
+            </div>
             <div style={{ fontSize: 22, marginBottom: 8, color: colorOf(selected.userId) }}>
               🔵 Reservoir loop
             </div>

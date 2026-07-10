@@ -16,6 +16,7 @@ export default async function HomePage() {
   // Stable colour per member, by leaderboard order.
   const members: TimelineMember[] = leaderboard.map((r, i) => ({
     userId: r.userId,
+    stravaAthleteId: r.stravaAthleteId,
     displayName: r.displayName,
     color: colorFor(i),
   }));
@@ -70,9 +71,14 @@ export default async function HomePage() {
                   {i + 1}
                 </span>
                 <Avatar url={r.avatarUrl} name={r.displayName} color={colorFor(i)} />
-                <span style={{ flex: 1, fontWeight: 500, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <a
+                  href={`https://www.strava.com/athletes/${r.stravaAthleteId}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ flex: 1, color: "inherit", fontWeight: 500, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                >
                   {r.displayName}
-                </span>
+                </a>
                 <div style={{ textAlign: "right" }}>
                   <div style={{ fontVariantNumeric: "tabular-nums", fontSize: 18, fontWeight: 700 }}>
                     {r.loops}

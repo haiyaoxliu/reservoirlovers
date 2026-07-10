@@ -4,6 +4,7 @@ import { activities, loopEvents, users } from "../db/schema";
 
 export interface LeaderboardRow {
   userId: number;
+  stravaAthleteId: number;
   displayName: string;
   avatarUrl: string | null;
   loops: number;
@@ -16,6 +17,7 @@ export async function getLeaderboard(): Promise<LeaderboardRow[]> {
   const rows = await db
     .select({
       userId: users.id,
+      stravaAthleteId: users.stravaAthleteId,
       displayName: users.displayName,
       avatarUrl: users.avatarUrl,
       loops: sql<number>`coalesce(sum(case when ${loopEvents.kind} = 'full' then 1 else 0 end), 0)`,
@@ -23,11 +25,12 @@ export async function getLeaderboard(): Promise<LeaderboardRow[]> {
     })
     .from(users)
     .leftJoin(loopEvents, eq(loopEvents.userId, users.id))
-    .groupBy(users.id, users.displayName, users.avatarUrl)
+    .groupBy(users.id, users.stravaAthleteId, users.displayName, users.avatarUrl)
     .orderBy(desc(sql`coalesce(sum(case when ${loopEvents.kind} = 'full' then 1 else 0 end), 0)`));
 
   return rows.map((r) => ({
     userId: r.userId,
+    stravaAthleteId: r.stravaAthleteId,
     displayName: r.displayName,
     avatarUrl: r.avatarUrl,
     loops: Number(r.loops),
