@@ -7,20 +7,33 @@ export interface TierMark {
   pct: number;
   /** Cumulative loop count at this boundary. */
   label: string;
+  /** The headline number (full + tolerance loops) — brighter, never dropped. */
+  main?: boolean;
 }
 
 /**
  * Loop counts at the leaderboard bar's tier boundaries. Small corner text in
  * detail mode; large full-height watermark numbers in clean mode (where the
- * column headers are hidden). Marks too close to the next one are dropped.
+ * column headers are hidden). When boundaries sit too close together the
+ * main mark wins and the others are dropped.
  */
 export function TierMarks({ marks }: { marks: TierMark[] }) {
-  const { display } = useSettings();
-  const clean = display === "clean";
+  const { prefs } = useSettings();
+  // With the stat columns hidden, the watermarks carry the counts full-size.
+  const clean = !prefs.statColumns;
   const minGapPct = clean ? 10 : 5;
-  const visible = marks.filter(
-    (mk, idx, arr) => mk.pct > 0 && (idx === arr.length - 1 || arr[idx + 1].pct - mk.pct > minGapPct),
-  );
+
+  // Place the main mark first, then the rest outermost-first, keeping each
+  // only if it clears every already-placed mark.
+  const candidates = [
+    ...marks.filter((mk) => mk.main),
+    ...marks.filter((mk) => !mk.main).sort((a, b) => b.pct - a.pct),
+  ].filter((mk) => mk.pct > 0);
+  const visible: TierMark[] = [];
+  for (const mk of candidates) {
+    if (visible.every((v) => Math.abs(v.pct - mk.pct) > minGapPct)) visible.push(mk);
+  }
+
   return (
     <>
       {visible.map((mk) => (
@@ -39,8 +52,8 @@ export function TierMarks({ marks }: { marks: TierMark[] }) {
                   paddingRight: 5,
                   fontSize: 24,
                   fontWeight: 700,
-                  color: "var(--muted)",
-                  opacity: 0.4,
+                  color: mk.main ? "var(--text)" : "var(--muted)",
+                  opacity: mk.main ? 0.55 : 0.4,
                   fontVariantNumeric: "tabular-nums",
                   pointerEvents: "none",
                 }
@@ -52,7 +65,8 @@ export function TierMarks({ marks }: { marks: TierMark[] }) {
                   paddingRight: 3,
                   fontSize: 8.5,
                   lineHeight: 1,
-                  color: "var(--muted)",
+                  color: mk.main ? "var(--text)" : "var(--muted)",
+                  opacity: mk.main ? 0.8 : 1,
                   fontVariantNumeric: "tabular-nums",
                   pointerEvents: "none",
                 }

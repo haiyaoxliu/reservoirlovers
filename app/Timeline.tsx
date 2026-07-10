@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef } from "react";
 import type { TimelineEvent } from "@/lib/queries";
-import { ExternalLinkIcon } from "./ExternalLinkIcon";
 import { Avatar } from "./Avatar";
 import { DetailOnly } from "./Settings";
 
@@ -35,7 +34,7 @@ export function stravaProfileUrl(athleteId: number): string {
 
 const LANE_H = 46;
 const LABEL_W = 72;
-const HEADER_H = 46;
+const HEADER_H = 28;
 /** Horizontal spacing between same-day dots in one lane. */
 const DOT_SPACING = 16;
 const MIN_COL_W = 44;
@@ -168,7 +167,7 @@ export function Timeline({
     <div style={{ position: "relative" }}>
       <div className="bleed">
         {/* Section header, matching the leaderboard's — help text right-aligned */}
-        <DetailOnly>
+        <DetailOnly pref="headers">
         <h2
           style={{
             margin: 0,
@@ -260,22 +259,18 @@ export function Timeline({
             borderRight: "1px solid var(--border)",
           }}
         >
-          {/* Corner cell: Strava mark + down arrow — the avatars below link
-              to Strava profiles */}
+          {/* Corner cell: Strava mark — the avatars below link to profiles */}
           <div
             style={{
               height: HEADER_H,
               display: "flex",
-              alignItems: "flex-end",
+              alignItems: "center",
               justifyContent: "center",
-              gap: 3,
-              paddingBottom: 6,
               color: "var(--muted)",
             }}
             title="Avatars link to Strava profiles"
           >
-            <StravaIcon />
-            <span style={{ fontSize: 10, lineHeight: "12px" }}>↓</span>
+            <StravaIcon size={16} />
           </div>
           {members.map((m) => (
             <div
@@ -298,13 +293,11 @@ export function Timeline({
                   flex: 1,
                   display: "flex",
                   alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: 6,
+                  justifyContent: "center",
                   color: "inherit",
                 }}
               >
                 <Avatar url={m.avatarUrl} name={m.displayName} color={m.color} />
-                <ExternalLinkIcon size={11} />
               </a>
             </div>
           ))}
@@ -337,37 +330,8 @@ export function Timeline({
                 }}
               />
             ) : null}
-            <div style={{ position: "relative", height: HEADER_H }}>
-            {ticks.map((t, i) => (
-              <div
-                key={i}
-                style={{
-                  position: "absolute",
-                  left: t.x,
-                  width: t.w,
-                  top: 0,
-                  height: HEADER_H,
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "flex-end",
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                }}
-              >
-                <span style={{ height: 12, fontSize: 9, lineHeight: "12px", color: "var(--muted)" }}>
-                  {t.year}
-                </span>
-                <span style={{ height: 13, fontSize: 10, lineHeight: "13px", color: "var(--muted)" }}>
-                  {t.month}
-                </span>
-                <span style={{ height: 15, fontSize: 11, lineHeight: "15px", fontWeight: 600 }}>
-                  {t.day}
-                </span>
-                <span style={{ width: 1, height: 4, background: "var(--border-btn)" }} />
-              </div>
-            ))}
-            </div>
+            {/* Slim spacer row (dates live in the detail panel and slider) */}
+            <div style={{ height: HEADER_H }} />
 
           {/* Lanes — dots only; the member rail is outside the scroll area */}
           {members.map((m) => {

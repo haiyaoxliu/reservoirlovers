@@ -63,3 +63,15 @@ button {
   margin-left: -16px;
   margin-right: -16px;
 }
+
+/* With rank & avatars hidden, the name shrinks to the top-left corner so the
+   watermark tier numbers own the row. */
+:root[data-rowchrome="off"] .lb-row {
+  align-items: flex-start !important;
+  min-height: 42px;
+}
+:root[data-rowchrome="off"] .lb-name {
+  font-size: 11px !important;
+  font-weight: 400 !important;
+  color: var(--muted);
+}

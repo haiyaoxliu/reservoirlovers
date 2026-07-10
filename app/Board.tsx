@@ -89,7 +89,7 @@ export function Board({
     for (const e of events) set.add(dayFloor(new Date(e.eventTime).getTime()));
     return [...set].sort((a, b) => a - b);
   }, [events]);
-  const { mapWindow, display } = useSettings();
+  const { mapWindow, prefs } = useSettings();
   const windowDays = mapWindow === "wide" ? 8 : 4;
   const maxStartIdx = Math.max(0, days.length - windowDays);
   const [startIdxRaw, setStartIdx] = useState<number | null>(null);
@@ -105,19 +105,15 @@ export function Board({
   }, [events, windowStart, windowEnd]);
 
   // Select an event: slide the window to cover its day if needed (centred
-  // when possible), and un-hide the member on the map so it's visible.
+  // when possible), and solo the member on the map — their pill on, all
+  // others off.
   const selectEvent = (e: TimelineEvent) => {
     setSelected(e);
     const idx = days.indexOf(dayFloor(new Date(e.eventTime).getTime()));
     if (idx >= 0 && (idx < startIdx || idx > startIdx + windowDays - 1)) {
       setStartIdx(Math.max(0, Math.min(idx - Math.floor(windowDays / 2), maxStartIdx)));
     }
-    setHidden((prev) => {
-      if (!prev.has(e.userId)) return prev;
-      const next = new Set(prev);
-      next.delete(e.userId);
-      return next;
-    });
+    setHidden(new Set(members.filter((m) => m.userId !== e.userId).map((m) => m.userId)));
   };
 
   // Prev/next within the selected member's own event sequence (oldest first).
@@ -270,9 +266,9 @@ export function Board({
 
       <section>
         <div className="bleed" style={{ display: "flex", flexDirection: "column" }}>
-          {/* Header (hidden in clean mode) carries the member toggles, so
-              they hide with it; the slider row below always stays. */}
-          <DetailOnly>
+          {/* Header (hideable) carries the member toggles, so they hide with
+              it; the slider row below always stays. */}
+          <DetailOnly pref="headers">
             <h2
               style={{
                 ...headerStyle,
@@ -349,7 +345,7 @@ export function Board({
                 aria-label="Date range shown on the map"
                 style={{ flex: 1 }}
               />
-              {display === "detail" ? (
+              {prefs.sliderDates ? (
                 <span
                   style={{
                     fontSize: 11,
@@ -493,7 +489,9 @@ export function Board({
                         fontSize: selected.kind === "full" ? undefined : 13,
                       }}
                     >
-                      {selected.kind === "full" ? (
+                      {!prefs.detailMeta || selected.kind === "full" ? (
+                        // Uniform compact stat: time for clean 100% loops,
+                        // time · % (or just %) for everything else.
                         [
                           formatDuration(selected.elapsedSeconds),
                           selected.percent < 100 ? `${selected.percent}%` : null,
@@ -509,7 +507,7 @@ export function Board({
                       <ExternalLinkIcon size={11} />
                     </a>
                   </div>
-                  {display === "detail" ? (
+                  {prefs.detailMeta ? (
                     <div
                       style={{
                         color: "var(--muted)",

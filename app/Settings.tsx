@@ -5,28 +5,49 @@ import { createContext, useContext, useEffect, useState } from "react";
 type Units = "km" | "mi";
 type Theme = "dark" | "light";
 type MapWindow = "normal" | "wide";
-type Display = "detail" | "clean";
+
+/** Individually toggleable pieces of secondary chrome. All default to shown. */
+export interface DetailPrefs {
+  /** Section header stripes (leaderboard columns, timeline help, map pills). */
+  headers: boolean;
+  /** Leaderboard rank numbers and avatars; off also shrinks names. */
+  rowChrome: boolean;
+  /** Leaderboard PR / distance / loop-count columns; off enlarges the
+   *  watermark tier numbers to carry the counts. */
+  statColumns: boolean;
+  /** Date-range text next to the map window slider. */
+  sliderDates: boolean;
+  /** Second line (date · activity) in the selection detail panel. */
+  detailMeta: boolean;
+}
+
+const DEFAULT_PREFS: DetailPrefs = {
+  headers: true,
+  rowChrome: true,
+  statColumns: true,
+  sliderDates: true,
+  detailMeta: true,
+};
 
 const SettingsContext = createContext<{
   units: Units;
   theme: Theme;
   /** How many timeline date columns the map window spans: normal 4, wide 8. */
   mapWindow: MapWindow;
-  /** "clean" hides section headers and secondary text. */
-  display: Display;
+  prefs: DetailPrefs;
   setUnits: (u: Units) => void;
   setTheme: (t: Theme) => void;
   setMapWindow: (w: MapWindow) => void;
-  setDisplay: (d: Display) => void;
+  setPref: (key: keyof DetailPrefs, value: boolean) => void;
 }>({
   units: "km",
   theme: "dark",
   mapWindow: "normal",
-  display: "detail",
+  prefs: DEFAULT_PREFS,
   setUnits: () => {},
   setTheme: () => {},
   setMapWindow: () => {},
-  setDisplay: () => {},
+  setPref: () => {},
 });
 
 export const useSettings = () => useContext(SettingsContext);
@@ -35,17 +56,17 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [units, setUnitsState] = useState<Units>("km");
   const [theme, setThemeState] = useState<Theme>("dark");
   const [mapWindow, setMapWindowState] = useState<MapWindow>("normal");
-  const [display, setDisplayState] = useState<Display>("detail");
+  const [prefs, setPrefsState] = useState<DetailPrefs>(DEFAULT_PREFS);
 
-  // localStorage is read after mount so the server render (km/dark) hydrates
-  // cleanly; the theme itself is applied pre-paint by the inline script in
-  // layout.tsx, so there is no visual flash.
+  // localStorage is read after mount so the server render hydrates cleanly;
+  // theme and row-chrome CSS are applied pre-paint by the layout.tsx script.
   useEffect(() => {
     try {
       if (localStorage.getItem("rl-units") === "mi") setUnitsState("mi");
       if (localStorage.getItem("rl-theme") === "light") setThemeState("light");
       if (localStorage.getItem("rl-map-window") === "wide") setMapWindowState("wide");
-      if (localStorage.getItem("rl-display") === "clean") setDisplayState("clean");
+      const stored = JSON.parse(localStorage.getItem("rl-detail") ?? "{}");
+      setPrefsState({ ...DEFAULT_PREFS, ...stored });
     } catch {}
   }, []);
 
@@ -68,27 +89,38 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem("rl-map-window", w);
     } catch {}
   };
-  const setDisplay = (d: Display) => {
-    setDisplayState(d);
-    try {
-      localStorage.setItem("rl-display", d);
-    } catch {}
+  const setPref = (key: keyof DetailPrefs, value: boolean) => {
+    setPrefsState((prev) => {
+      const next = { ...prev, [key]: value };
+      if (key === "rowChrome") {
+        document.documentElement.dataset.rowchrome = value ? "on" : "off";
+      }
+      try {
+        localStorage.setItem("rl-detail", JSON.stringify(next));
+      } catch {}
+      return next;
+    });
   };
 
   return (
     <SettingsContext.Provider
-      value={{ units, theme, mapWindow, display, setUnits, setTheme, setMapWindow, setDisplay }}
+      value={{ units, theme, mapWindow, prefs, setUnits, setTheme, setMapWindow, setPref }}
     >
       {children}
     </SettingsContext.Provider>
   );
 }
 
-/** Renders children only in "detail" display mode — for section headers and
- *  other secondary chrome that "clean" hides. */
-export function DetailOnly({ children }: { children: React.ReactNode }) {
-  const { display } = useSettings();
-  return display === "detail" ? <>{children}</> : null;
+/** Renders children only when the given detail preference is shown. */
+export function DetailOnly({
+  pref,
+  children,
+}: {
+  pref: keyof DetailPrefs;
+  children: React.ReactNode;
+}) {
+  const { prefs } = useSettings();
+  return prefs[pref] ? <>{children}</> : null;
 }
 
 const KM_PER_MI = 1.609344;
@@ -147,6 +179,33 @@ function LogoutIcon({ size = 16 }: { size?: number }) {
   );
 }
 
+/** Sliders glyph for the detail-visibility controls. */
+function SlidersIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <line x1="4" y1="21" x2="4" y2="14" />
+      <line x1="4" y1="10" x2="4" y2="3" />
+      <line x1="12" y1="21" x2="12" y2="12" />
+      <line x1="12" y1="8" x2="12" y2="3" />
+      <line x1="20" y1="21" x2="20" y2="16" />
+      <line x1="20" y1="12" x2="20" y2="3" />
+      <line x1="1" y1="14" x2="7" y2="14" />
+      <line x1="9" y1="8" x2="15" y2="8" />
+      <line x1="17" y1="16" x2="23" y2="16" />
+    </svg>
+  );
+}
+
 const iconButtonStyle: React.CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
@@ -201,15 +260,99 @@ function Segmented<T extends string>({
   );
 }
 
-/** Header buttons: settings gear (opens the modal) and sign-out. */
+function Modal({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.5)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 30,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: "var(--panel-2)",
+          border: "1px solid var(--border)",
+          borderRadius: 12,
+          padding: 20,
+          minWidth: 280,
+          maxWidth: 360,
+        }}
+      >
+        {children}
+        <button
+          onClick={onClose}
+          style={{
+            marginTop: 18,
+            background: "transparent",
+            color: "var(--muted)",
+            border: "1px solid var(--border-btn)",
+            borderRadius: 8,
+            padding: "6px 12px",
+            cursor: "pointer",
+          }}
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 16,
+        marginBottom: 12,
+      }}
+    >
+      <span style={{ fontSize: 14 }}>{label}</span>
+      {children}
+    </div>
+  );
+}
+
+const DETAIL_TOGGLES: { key: keyof DetailPrefs; label: string }[] = [
+  { key: "headers", label: "Section headers" },
+  { key: "rowChrome", label: "Rank & avatars" },
+  { key: "statColumns", label: "Stat columns" },
+  { key: "sliderDates", label: "Slider dates" },
+  { key: "detailMeta", label: "Selection info" },
+];
+
+/** Header buttons: detail visibility controls, settings, and sign-out. */
 export function HeaderActions() {
-  const [open, setOpen] = useState(false);
-  const { units, theme, mapWindow, display, setUnits, setTheme, setMapWindow, setDisplay } =
+  const [openSettings, setOpenSettings] = useState(false);
+  const [openDetail, setOpenDetail] = useState(false);
+  const { units, theme, mapWindow, prefs, setUnits, setTheme, setMapWindow, setPref } =
     useSettings();
 
   return (
     <div style={{ display: "flex", gap: 8 }}>
-      <button aria-label="Settings" title="Settings" onClick={() => setOpen(true)} style={iconButtonStyle}>
+      <button
+        aria-label="Detail visibility"
+        title="Detail visibility"
+        onClick={() => setOpenDetail(true)}
+        style={iconButtonStyle}
+      >
+        <SlidersIcon />
+      </button>
+      <button
+        aria-label="Settings"
+        title="Settings"
+        onClick={() => setOpenSettings(true)}
+        style={iconButtonStyle}
+      >
         <GearIcon />
       </button>
       <form action="/api/auth/logout" method="post">
@@ -218,122 +361,58 @@ export function HeaderActions() {
         </button>
       </form>
 
-      {open ? (
-        <div
-          onClick={() => setOpen(false)}
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.5)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 30,
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              background: "var(--panel-2)",
-              border: "1px solid var(--border)",
-              borderRadius: 12,
-              padding: 20,
-              minWidth: 260,
-              maxWidth: 340,
-            }}
-          >
-            <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 16 }}>Settings</div>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 16,
-                marginBottom: 12,
-              }}
-            >
-              <span style={{ fontSize: 14 }}>Units</span>
+      {openDetail ? (
+        <Modal onClose={() => setOpenDetail(false)}>
+          <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 16 }}>Detail visibility</div>
+          {DETAIL_TOGGLES.map((t) => (
+            <Row key={t.key} label={t.label}>
               <Segmented
-                value={units}
+                value={prefs[t.key] ? "show" : "hide"}
                 options={[
-                  { v: "km", label: "km" },
-                  { v: "mi", label: "mi" },
+                  { v: "show", label: "Show" },
+                  { v: "hide", label: "Hide" },
                 ]}
-                onChange={setUnits}
+                onChange={(v) => setPref(t.key, v === "show")}
               />
-            </div>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 16,
-                marginBottom: 12,
-              }}
-            >
-              <span style={{ fontSize: 14 }}>Theme</span>
-              <Segmented
-                value={theme}
-                options={[
-                  { v: "dark", label: "Dark" },
-                  { v: "light", label: "Light" },
-                ]}
-                onChange={setTheme}
-              />
-            </div>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 16,
-                marginBottom: 12,
-              }}
-            >
-              <span style={{ fontSize: 14 }}>Map window</span>
-              <Segmented
-                value={mapWindow}
-                options={[
-                  { v: "normal", label: "Normal" },
-                  { v: "wide", label: "Wide" },
-                ]}
-                onChange={setMapWindow}
-              />
-            </div>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 16,
-              }}
-            >
-              <span style={{ fontSize: 14 }}>Display</span>
-              <Segmented
-                value={display}
-                options={[
-                  { v: "detail", label: "Detail" },
-                  { v: "clean", label: "Clean" },
-                ]}
-                onChange={setDisplay}
-              />
-            </div>
-            <button
-              onClick={() => setOpen(false)}
-              style={{
-                marginTop: 18,
-                background: "transparent",
-                color: "var(--muted)",
-                border: "1px solid var(--border-btn)",
-                borderRadius: 8,
-                padding: "6px 12px",
-                cursor: "pointer",
-              }}
-            >
-              Close
-            </button>
-          </div>
-        </div>
+            </Row>
+          ))}
+        </Modal>
+      ) : null}
+
+      {openSettings ? (
+        <Modal onClose={() => setOpenSettings(false)}>
+          <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 16 }}>Settings</div>
+          <Row label="Units">
+            <Segmented
+              value={units}
+              options={[
+                { v: "km", label: "km" },
+                { v: "mi", label: "mi" },
+              ]}
+              onChange={setUnits}
+            />
+          </Row>
+          <Row label="Theme">
+            <Segmented
+              value={theme}
+              options={[
+                { v: "dark", label: "Dark" },
+                { v: "light", label: "Light" },
+              ]}
+              onChange={setTheme}
+            />
+          </Row>
+          <Row label="Map window">
+            <Segmented
+              value={mapWindow}
+              options={[
+                { v: "normal", label: "Normal" },
+                { v: "wide", label: "Wide" },
+              ]}
+              onChange={setMapWindow}
+            />
+          </Row>
+        </Modal>
       ) : null}
     </div>
   );

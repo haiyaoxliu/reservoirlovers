@@ -44,7 +44,7 @@ export default async function HomePage() {
 
       <section style={{ marginBottom: 32 }}>
         <div className="bleed" style={{ borderBottom: "1px solid var(--border)" }}>
-          <DetailOnly>
+          <DetailOnly pref="headers">
           <h2
             style={{
               margin: 0,
@@ -76,22 +76,32 @@ export default async function HomePage() {
             // The stripe doubles as the relative bar, in three opacity tiers:
             // clean 100% loops (brightest) → 98-99% tolerance fulls (slightly
             // dimmer) → partial credit (faint), out to the total score.
-            const pctOf = (v: number) => (maxTotal > 0 ? (v / maxTotal) * 100 : 0);
+            // Every bar starts with a fixed pad of the full-loop colour so
+            // the main count (and the rank, in detail view) always has a
+            // stripe to sit on; real values scale into the remaining width.
+            const BAR_PAD_PCT = 12;
+            const pctOf = (v: number) =>
+              BAR_PAD_PCT + (maxTotal > 0 ? (v / maxTotal) * (100 - BAR_PAD_PCT) : 0);
             const exactPct = pctOf(r.exactFullPercent);
             const fullPct = pctOf(r.exactFullPercent + r.toleranceFullPercent);
             const totalPct = pctOf(r.totalPercent);
             const c = colorFor(i);
             // Cumulative loop count at each tier boundary (TierMarks handles
-            // overlap-dropping and detail/clean sizing).
+            // overlap-dropping and sizing). The main count always shows.
             const fmtLoops = (v: number) => v.toFixed(1).replace(/\.0$/, "");
             const tierMarks = [
-              { pct: exactPct, label: fmtLoops(r.exactFullPercent / 100) },
-              { pct: fullPct, label: String(r.loops) },
-              { pct: totalPct, label: fmtLoops(r.totalPercent / 100) },
+              ...(r.exactFullPercent > 0
+                ? [{ pct: exactPct, label: fmtLoops(r.exactFullPercent / 100) }]
+                : []),
+              { pct: fullPct, label: String(r.loops), main: true },
+              ...(r.totalPercent > 0
+                ? [{ pct: totalPct, label: fmtLoops(r.totalPercent / 100) }]
+                : []),
             ];
             return (
               <div
                 key={r.userId}
+                className="lb-row"
                 style={{
                   position: "relative",
                   display: "flex",
@@ -104,17 +114,22 @@ export default async function HomePage() {
                 }}
               >
                 <TierMarks marks={tierMarks} />
-                <span style={{ width: 18, color: "var(--muted)", fontVariantNumeric: "tabular-nums" }}>
-                  {i + 1}
-                </span>
-                <Avatar url={r.avatarUrl} name={r.displayName} color={colorFor(i)} />
-                <span style={{ flex: 1, fontWeight: 500, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <DetailOnly pref="rowChrome">
+                  <span style={{ width: 18, color: "var(--muted)", fontVariantNumeric: "tabular-nums" }}>
+                    {i + 1}
+                  </span>
+                  <Avatar url={r.avatarUrl} name={r.displayName} color={colorFor(i)} />
+                </DetailOnly>
+                <span
+                  className="lb-name"
+                  style={{ flex: 1, fontWeight: 500, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                >
                   {r.displayName}
                 </span>
                 {/* Fixed-width right-aligned columns so PR / km / loops line
-                    up vertically across rows; hidden entirely in clean mode
-                    (the watermark tier counts carry the numbers there). */}
-                <DetailOnly>
+                    up vertically across rows; when hidden, the watermark tier
+                    counts carry the numbers. */}
+                <DetailOnly pref="statColumns">
                 <div style={{ display: "flex", alignItems: "baseline" }}>
                   <span
                     style={{
