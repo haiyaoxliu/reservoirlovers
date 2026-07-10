@@ -37,7 +37,6 @@ export function LeaderboardRow({
   toleranceFullPercent,
   totalPercent,
   loops,
-  stats,
   children,
 }: {
   color: string;
@@ -46,9 +45,6 @@ export function LeaderboardRow({
   toleranceFullPercent: number;
   totalPercent: number;
   loops: number;
-  /** Stat columns, rendered in their own section right of the bar so the
-   *  bar colouring never runs under them. */
-  stats?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const pctOf = (v: number) => (maxTotal > 0 ? (v / maxTotal) * 100 : 0);
@@ -68,30 +64,20 @@ export function LeaderboardRow({
 
   return (
     <div
+      className="lb-row"
       style={{
+        position: "relative",
         display: "flex",
-        alignItems: "stretch",
+        alignItems: "center",
+        gap: 10,
         backgroundColor: "var(--panel)",
+        backgroundImage: `linear-gradient(90deg, ${color}66 ${exactPct}%, ${color}59 ${exactPct}%, ${color}59 ${fullPct}%, ${color}2e ${fullPct}%, ${color}2e ${totalPct}%, transparent ${totalPct}%)`,
         borderTop: "1px solid var(--border)",
+        padding: "8px 16px",
       }}
     >
-      <div
-        className="lb-row"
-        style={{
-          position: "relative",
-          flex: 1,
-          minWidth: 0,
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-          backgroundImage: `linear-gradient(90deg, ${color}66 ${exactPct}%, ${color}59 ${exactPct}%, ${color}59 ${fullPct}%, ${color}2e ${fullPct}%, ${color}2e ${totalPct}%, transparent ${totalPct}%)`,
-          padding: "8px 8px 8px 16px",
-        }}
-      >
-        <TierMarks marks={marks} />
-        {children}
-      </div>
-      {stats}
+      <TierMarks marks={marks} />
+      {children}
     </div>
   );
 }

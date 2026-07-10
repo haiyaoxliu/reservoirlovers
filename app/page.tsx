@@ -88,55 +88,6 @@ export default async function HomePage() {
                 toleranceFullPercent={r.toleranceFullPercent}
                 totalPercent={r.totalPercent}
                 loops={r.loops}
-                stats={
-                  /* Fixed-width right-aligned columns in their own section
-                     right of the bar; hidden with the column headers. */
-                  <DetailOnly pref="statColumns">
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        padding: "0 16px 0 8px",
-                      }}
-                    >
-                      <div style={{ display: "flex", alignItems: "baseline" }}>
-                        <span
-                          style={{
-                            width: 66,
-                            textAlign: "right",
-                            fontSize: 11,
-                            color: "var(--muted)",
-                            fontVariantNumeric: "tabular-nums",
-                          }}
-                        >
-                          {formatDuration(r.fastestSeconds) ?? ""}
-                        </span>
-                        <span
-                          style={{
-                            width: 62,
-                            textAlign: "right",
-                            fontSize: 11,
-                            color: "var(--muted)",
-                            fontVariantNumeric: "tabular-nums",
-                          }}
-                        >
-                          {r.totalPercent > 0 ? <Distance km={kmOf(r.totalPercent)} bare /> : ""}
-                        </span>
-                        <span
-                          style={{
-                            width: 40,
-                            textAlign: "right",
-                            fontVariantNumeric: "tabular-nums",
-                            fontSize: 18,
-                            fontWeight: 700,
-                          }}
-                        >
-                          {r.loops}
-                        </span>
-                      </div>
-                    </div>
-                  </DetailOnly>
-                }
               >
                 <DetailOnly pref="rowChrome">
                   <span style={{ width: 18, color: "var(--muted)", fontVariantNumeric: "tabular-nums" }}>
@@ -145,6 +96,46 @@ export default async function HomePage() {
                   <Avatar url={r.avatarUrl} name={r.displayName} color={colorFor(i)} />
                 </DetailOnly>
                 <MemberName name={r.displayName} />
+                {/* Fixed-width right-aligned columns so PR / km / loops line
+                    up vertically across rows; hidden with the headers'
+                    column labels. */}
+                <DetailOnly pref="statColumns">
+                  <div style={{ display: "flex", alignItems: "baseline" }}>
+                    <span
+                      style={{
+                        width: 66,
+                        textAlign: "right",
+                        fontSize: 11,
+                        color: "var(--muted)",
+                        fontVariantNumeric: "tabular-nums",
+                      }}
+                    >
+                      {formatDuration(r.fastestSeconds) ?? ""}
+                    </span>
+                    <span
+                      style={{
+                        width: 62,
+                        textAlign: "right",
+                        fontSize: 11,
+                        color: "var(--muted)",
+                        fontVariantNumeric: "tabular-nums",
+                      }}
+                    >
+                      {r.totalPercent > 0 ? <Distance km={kmOf(r.totalPercent)} bare /> : ""}
+                    </span>
+                    <span
+                      style={{
+                        width: 40,
+                        textAlign: "right",
+                        fontVariantNumeric: "tabular-nums",
+                        fontSize: 18,
+                        fontWeight: 700,
+                      }}
+                    >
+                      {r.loops}
+                    </span>
+                  </div>
+                </DetailOnly>
               </LeaderboardRow>
             );
           })}

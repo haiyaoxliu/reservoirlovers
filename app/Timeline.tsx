@@ -140,9 +140,17 @@ export function Timeline({
     return { laneEvents: byLane, width: acc, ticks: dayTicks, minT: sorted[0].t };
   }, [events, members]);
 
+  // Start scrolled to the most recent end, like the map window.
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const didInitScroll = useRef(false);
+  useEffect(() => {
+    if (didInitScroll.current || !scrollRef.current) return;
+    scrollRef.current.scrollLeft = scrollRef.current.scrollWidth;
+    didInitScroll.current = true;
+  }, [width]);
+
   // Bring the selected dot into view (e.g. when stepping with prev/next or
   // tapping on the map).
-  const scrollRef = useRef<HTMLDivElement>(null);
   const selectedId = selected?.id;
   useEffect(() => {
     if (selectedId == null) return;

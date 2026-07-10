@@ -418,9 +418,9 @@ export function Board({
                 />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-                    <span style={{ fontWeight: 600 }}>{selected.displayName}</span>
-                    {/* The stat links to the Strava activity itself, coloured
-                        by tier like the rest of the site. */}
+                    {/* No name here — the map header already shows whose runs
+                        these are. The stat links to the Strava activity,
+                        coloured by tier like the rest of the site. */}
                     <a
                       href={`https://www.strava.com/activities/${selected.stravaActivityId}`}
                       target="_blank"
@@ -440,24 +440,12 @@ export function Board({
                         fontSize: selected.kind === "full" ? undefined : 13,
                       }}
                     >
-                      {!prefs.detailMeta || selected.kind === "full" ? (
-                        // Uniform stat: time for clean 100% loops, time · %
-                        // for everything else (partials use segment time).
-                        [
-                          formatDuration(selected.durationSeconds),
-                          selected.percent < 100 ? `${selected.percent}%` : null,
-                        ]
-                          .filter(Boolean)
-                          .join(" · ")
-                      ) : (
-                        <>
-                          partial ·{" "}
-                          {[formatDuration(selected.durationSeconds), `${selected.percent}%`]
-                            .filter(Boolean)
-                            .join(" · ")}{" "}
-                          (<Distance km={((selected.percent / 100) * loop.totalMeters) / 1000} />)
-                        </>
-                      )}
+                      {/* Uniform for every event: time · percent · distance */}
+                      {[formatDuration(selected.durationSeconds), `${selected.percent}%`]
+                        .filter(Boolean)
+                        .join(" · ")}
+                      {" · "}
+                      <Distance km={((selected.percent / 100) * loop.totalMeters) / 1000} />
                       <ExternalLinkIcon size={11} />
                     </a>
                   </div>
@@ -471,13 +459,10 @@ export function Board({
                         textOverflow: "ellipsis",
                       }}
                     >
-                      {new Date(selected.eventTime).toLocaleString("en-US", {
-                        weekday: "short",
-                        month: "short",
-                        day: "numeric",
-                        hour: "numeric",
-                        minute: "2-digit",
-                      })}
+                      {(() => {
+                        const d = new Date(selected.eventTime);
+                        return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
+                      })()}
                       {selected.activityName ? ` · ${selected.activityName}` : ""}
                     </div>
                   ) : null}

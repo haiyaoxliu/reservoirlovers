@@ -14,10 +14,10 @@ export interface TierMark {
 /**
  * Loop counts anchored to their bar segment's boundary. With the stat
  * columns shown they're small bottom-right corner text; with them hidden the
- * numbers grow to full-height watermarks. Either way the same placement rule
- * applies — a number that would overlap another flips to the right side of
- * its boundary, and if it still doesn't fit it keeps sliding right (dropping
- * to the small size when even that fails) until it does.
+ * numbers grow to full-height watermarks. All marks always render, laid out
+ * strictly left-to-right in tier order: each prefers right-alignment at its
+ * boundary, and otherwise slides right just past the previous number
+ * (dropping to the small size, then clamping, when space runs out).
  */
 export function TierMarks({ marks }: { marks: TierMark[] }) {
   const { prefs } = useSettings();
@@ -26,44 +26,28 @@ export function TierMarks({ marks }: { marks: TierMark[] }) {
   const smallWidthOf = (m: TierMark) => m.label.length * 1.5 + 0.5;
   const widthOf = (m: TierMark) => m.label.length * (clean ? 3.6 : 1.5) + 0.5;
 
-  const overlaps = (a: [number, number], b: [number, number]) => a[0] < b[1] && b[0] < a[1];
+  const ordered = [...marks].filter((mk) => mk.pct > 0).sort((a, b) => a.pct - b.pct);
 
-  // Main first so it always gets its preferred spot, then the rest inward
-  // from the right.
-  const ordered = [
-    ...marks.filter((mk) => mk.main),
-    ...marks.filter((mk) => !mk.main).sort((a, b) => b.pct - a.pct),
-  ].filter((mk) => mk.pct > 0);
-
-  const placed: { mk: TierMark; x: number; left: boolean; small: boolean; span: [number, number] }[] =
-    [];
-  // Smallest x >= from where [x, x+w] clears every placed span and the edge.
-  const slideRight = (from: number, w: number): number | null => {
-    let x = from;
-    for (let guard = 0; guard <= placed.length; guard++) {
-      const hit = placed.find((p) => overlaps(p.span, [x, x + w]));
-      if (!hit) break;
-      x = hit.span[1];
-    }
-    return x + w <= 100 ? x : null;
-  };
+  const placed: { mk: TierMark; x: number; left: boolean; small: boolean }[] = [];
+  let prevEnd = 0;
   for (const mk of ordered) {
-    const w = widthOf(mk);
-    const right: [number, number] = [mk.pct - w, mk.pct];
-    if (right[0] >= 0 && !placed.some((p) => overlaps(p.span, right))) {
-      placed.push({ mk, x: mk.pct, left: false, small: false, span: right });
+    let w = widthOf(mk);
+    if (mk.pct - w >= prevEnd) {
+      placed.push({ mk, x: mk.pct, left: false, small: false });
+      prevEnd = mk.pct;
       continue;
     }
-    // Flip to the right of the boundary, sliding further right as needed.
-    const slid = slideRight(mk.pct, w);
-    if (slid != null) {
-      placed.push({ mk, x: slid, left: true, small: false, span: [slid, slid + w] });
-      continue;
+    // Slide right just past the previous number, shrinking then clamping if
+    // the bar's edge is in the way.
+    let small = false;
+    let x = Math.max(prevEnd, mk.pct);
+    if (x + w > 100) {
+      small = true;
+      w = smallWidthOf(mk);
+      x = Math.min(Math.max(prevEnd, mk.pct), 100 - w);
     }
-    // Last resort: small size, slid right until it fits.
-    const sw = smallWidthOf(mk);
-    const slidSmall = slideRight(mk.pct, sw) ?? 100 - sw;
-    placed.push({ mk, x: slidSmall, left: true, small: true, span: [slidSmall, slidSmall + sw] });
+    placed.push({ mk, x, left: true, small });
+    prevEnd = x + w;
   }
 
   return (
