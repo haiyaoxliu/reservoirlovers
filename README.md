@@ -109,11 +109,13 @@ npm run webhook:subscribe            # create
 npm run webhook:subscribe -- list    # verify
 ```
 
-### 5. Invite yourself and backfill
+### 5. Connect, backfill, invite friends
 
-- Visit `/admin`, create an invite, open its link, connect Strava.
+- Go to the site and **Connect with Strava**. Because your athlete id matches
+  `ADMIN_ATHLETE_ID`, you're let in without an invite and made admin.
 - Backfill your history: `npm run backfill -- <yourAthleteId>` (or `npm run
   backfill` for everyone). Re-run if it stops on a rate limit.
+- Go to `/admin` to create invite links and send them to the club.
 
 ## Tuning the matcher
 
