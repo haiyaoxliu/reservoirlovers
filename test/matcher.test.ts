@@ -41,6 +41,15 @@ describe("matcher — full loops", () => {
     for (const f of fulls(ev)) expect(f.elapsedSeconds).toBeGreaterThan(500);
   });
 
+  it("counts a ~99% lap as a full loop with its true percent kept", () => {
+    const ev = matchActivity(synthRun({ moves: [{ type: "run", deltaPct: 99 }] }));
+    expect(fulls(ev)).toHaveLength(1);
+    expect(partials(ev)).toHaveLength(0);
+    expect(fulls(ev)[0].percent).toBeGreaterThanOrEqual(98);
+    expect(fulls(ev)[0].percent).toBeLessThanOrEqual(100);
+    expect(fulls(ev)[0].elapsedSeconds).toBeGreaterThan(500);
+  });
+
   it("credits a full loop when the run starts mid-loop", () => {
     const ev = matchActivity(
       synthRun({ startPct: 37, moves: [{ type: "run", deltaPct: 105 }] }),

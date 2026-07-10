@@ -1,6 +1,7 @@
 import {
   ENTER_M,
   EXIT_M,
+  FULL_TOLERANCE_PCT,
   GAP_BRIDGE_S,
   MAX_MEDIAN_D_M,
   MAX_SPEED_MPS,
@@ -18,7 +19,7 @@ export type Direction = "ccw" | "cw" | "mixed";
 
 export interface LoopEvent {
   kind: LoopEventKind;
-  /** 1–100. `full` events are always 100. */
+  /** 1–100. `full` events are 98–100 (2% tolerance, true percent kept). */
   percent: number;
   /** Seconds since activity start: completion instant (full) or segment end (partial). */
   eventTime: number;
@@ -215,8 +216,21 @@ function finalizeSegment(seg: Segment, out: LoopEvent[]): void {
     }
   }
 
+  // A near-complete leftover (≥ FULL_TOLERANCE_PCT) counts as a full loop,
+  // keeping its true percent for display.
   const remainder = total - emitted;
-  if (remainder > 0) {
+  if (remainder >= FULL_TOLERANCE_PCT) {
+    const completion = seg.commits[seg.commits.length - 1].t;
+    out.push({
+      kind: "full",
+      percent: remainder,
+      eventTime: completion,
+      segmentStartTime,
+      elapsedSeconds: Math.round(completion - lastFullTime),
+      direction,
+      endP: posAt(signed),
+    });
+  } else if (remainder > 0) {
     out.push({
       kind: "partial",
       percent: remainder,

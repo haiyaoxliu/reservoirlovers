@@ -139,17 +139,53 @@ export function Timeline({
 
   return (
     <div style={{ position: "relative" }}>
-      {/* The rail lives OUTSIDE the scroll container so the elastic overscroll
-          bounce at the data's end only moves the dots/markers, never the rail. */}
-      <div
-        className="bleed"
-        style={{
-          display: "flex",
-          borderTop: "1px solid var(--border)",
-          borderBottom: "1px solid var(--border)",
-          background: "var(--panel)",
-        }}
-      >
+      <div className="bleed">
+        {/* Section header, matching the leaderboard's — help text right-aligned */}
+        <h2
+          style={{
+            margin: 0,
+            fontSize: 12,
+            fontWeight: 600,
+            color: "var(--muted)",
+            textTransform: "uppercase",
+            letterSpacing: 1,
+            background: "var(--panel)",
+            borderTop: "1px solid var(--border)",
+            borderBottom: "1px solid var(--border)",
+            padding: "6px 16px",
+            display: "flex",
+            alignItems: "baseline",
+            justifyContent: "space-between",
+            gap: 12,
+          }}
+        >
+          <span>Timeline</span>
+          <span
+            style={{
+              textTransform: "none",
+              letterSpacing: 0,
+              fontWeight: 400,
+              fontSize: 11,
+              minWidth: 0,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            Swipe left/right · solid dots are full loops, faint dots partial credit · tap for
+            details{minT ? ` · since ${new Date(minT).toLocaleDateString()}` : ""}
+          </span>
+        </h2>
+
+        {/* The rail lives OUTSIDE the scroll container so the elastic overscroll
+            bounce at the data's end only moves the dots/markers, never the rail. */}
+        <div
+          style={{
+            display: "flex",
+            borderBottom: "1px solid var(--border)",
+            background: "var(--panel)",
+          }}
+        >
         <div
           style={{
             width: LABEL_W,
@@ -158,29 +194,8 @@ export function Timeline({
             borderRight: "1px solid var(--border)",
           }}
         >
-          {/* Header cell: the section title heads the date-marker stack the
-              same way member avatars head the dot lanes below. */}
-          <div
-            style={{
-              height: HEADER_H,
-              display: "flex",
-              alignItems: "flex-end",
-              padding: "0 8px 6px",
-            }}
-          >
-            <h2
-              style={{
-                margin: 0,
-                fontSize: 10,
-                fontWeight: 600,
-                color: "var(--muted)",
-                textTransform: "uppercase",
-                letterSpacing: 1,
-              }}
-            >
-              Timeline
-            </h2>
-          </div>
+          {/* Empty corner cell keeps the date-marker stack aligned with lanes */}
+          <div style={{ height: HEADER_H }} />
           {members.map((m) => (
             <div
               key={m.userId}
@@ -316,12 +331,8 @@ export function Timeline({
           })}
           </div>
         </div>
+        </div>
       </div>
-
-      <p style={{ color: "var(--muted)", fontSize: 12, marginTop: 8 }}>
-        Swipe left/right · solid dots are full loops, faint dots partial credit · tap for details
-        {minT ? ` · since ${new Date(minT).toLocaleDateString()}` : ""}
-      </p>
     </div>
   );
 }

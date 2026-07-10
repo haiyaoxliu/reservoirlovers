@@ -62,6 +62,11 @@ export const GAP_BRIDGE_S = 60;
  *  1% ≈ 25 m — the smallest increment that earns partial credit. */
 export const MIN_SEG_PCT = 1;
 
+/** A segment's leftover travel of at least this many percent counts as a
+ *  full loop (2% tolerance ≈ 50 m — GPS clipping a corner shouldn't cost
+ *  the lap). The event keeps its true percent for display. */
+export const FULL_TOLERANCE_PCT = 98;
+
 /**
  * Bridle-path defense: discard a segment whose *median* cross-track distance
  * exceeds this. Real reservoir runners sit at 5–8 m; bridle runners at 10–40 m.
@@ -73,7 +78,7 @@ export const MAX_MEDIAN_D_M = 12;
 export const MIN_ACTIVITY_M = 150;
 
 /** Bump when any constant above changes, to trigger reprocessing of activities. */
-export const ALGO_VERSION = 4;
+export const ALGO_VERSION = 5;
 
 /** Sport types that earn loop credit (foot-powered). */
 export const COUNTING_SPORT_TYPES = new Set([

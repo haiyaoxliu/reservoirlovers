@@ -213,13 +213,18 @@ export function Board({
     return { basePath: base, w: maxX - minX, h: maxY - minY, drawn: drawnEvents };
   }, [mapEvents, members, memberOf]);
 
-  // Partials render first so full-loop rings sit on top of them.
+  // Partials render first so full-loop rings sit on top of them, and the
+  // selected event renders last so its halo isn't covered.
   const visibleDrawn = useMemo(
     () =>
       drawn
         .filter(({ e }) => !hidden.has(e.userId))
-        .sort((a, b) => Number(a.full) - Number(b.full)),
-    [drawn, hidden],
+        .sort(
+          (a, b) =>
+            Number(a.e.id === selected?.id) - Number(b.e.id === selected?.id) ||
+            Number(a.full) - Number(b.full),
+        ),
+    [drawn, hidden, selected],
   );
 
   const selectedMember = selected ? memberOf.get(selected.userId) : null;
@@ -277,46 +282,59 @@ export function Board({
 
       <section>
         <div className="bleed" style={{ display: "flex", flexDirection: "column" }}>
-          <h2 style={headerStyle}>Map</h2>
-
-          {/* Member visibility toggles */}
-          <div
+          <h2
             style={{
+              ...headerStyle,
               display: "flex",
-              flexWrap: "wrap",
-              gap: 8,
-              padding: "10px 16px",
-              background: "var(--panel)",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
             }}
           >
-            {members.map((m) => {
-              const off = hidden.has(m.userId);
-              return (
-                <button
-                  key={m.userId}
-                  onClick={() => toggle(m.userId)}
-                  aria-pressed={!off}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    background: off ? "transparent" : m.color,
-                    border: `1px solid ${off ? "var(--border-btn)" : m.color}`,
-                    borderRadius: 999,
-                    padding: "3px 10px 3px 4px",
-                    color: off ? "var(--muted)" : "#04121f",
-                    fontWeight: off ? 400 : 600,
-                    fontSize: 12,
-                    cursor: "pointer",
-                    opacity: off ? 0.55 : 1,
-                  }}
-                >
-                  <Avatar url={m.avatarUrl} name={m.displayName} color={m.color} size={20} />
-                  {m.displayName}
-                </button>
-              );
-            })}
-          </div>
+            <span>Map</span>
+            {/* Member visibility toggles, right-aligned in the header. With
+                many members the pills shrink to avatars only. */}
+            <span
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                justifyContent: "flex-end",
+                gap: 6,
+                textTransform: "none",
+                letterSpacing: 0,
+              }}
+            >
+              {members.map((m) => {
+                const off = hidden.has(m.userId);
+                const compact = members.length > 5;
+                return (
+                  <button
+                    key={m.userId}
+                    onClick={() => toggle(m.userId)}
+                    aria-pressed={!off}
+                    title={m.displayName}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      background: off ? "transparent" : m.color,
+                      border: `1px solid ${off ? "var(--border-btn)" : m.color}`,
+                      borderRadius: 999,
+                      padding: compact ? 2 : "2px 10px 2px 3px",
+                      color: off ? "var(--muted)" : "#04121f",
+                      fontWeight: off ? 400 : 600,
+                      fontSize: 12,
+                      cursor: "pointer",
+                      opacity: off ? 0.55 : 1,
+                    }}
+                  >
+                    <Avatar url={m.avatarUrl} name={m.displayName} color={m.color} size={20} />
+                    {compact ? null : m.displayName}
+                  </button>
+                );
+              })}
+            </span>
+          </h2>
 
           {/* Just the reservoir: the canonical loop outline, nothing else.
               Flex `order` places the map after the detail strip visually. */}
@@ -338,16 +356,28 @@ export function Board({
               />
               {visibleDrawn.map(({ e, full, d, arrow, sx, sy, color }) => {
                 const isSel = selected?.id === e.id;
-                // Fulls prominent, partials dimmer (60% vs 30% opacity).
-                const stroke = isSel ? color : full ? `${color}99` : `${color}4d`;
-                const title = `${e.displayName} — ${full ? "full loop" : `${e.percent}%`} · ${new Date(e.eventTime).toLocaleDateString()}`;
+                // Strong hierarchy: fulls bright (80%), partials faint (20%),
+                // the selected event at full colour with a halo underneath.
+                const stroke = isSel ? color : full ? `${color}cc` : `${color}33`;
+                const title = `${e.displayName} — ${full ? (e.percent < 100 ? `full loop (${e.percent}%)` : "full loop") : `${e.percent}%`} · ${new Date(e.eventTime).toLocaleDateString()}`;
                 return (
                   <g key={e.id}>
+                    {isSel ? (
+                      <path
+                        d={d}
+                        fill="none"
+                        stroke="var(--text)"
+                        strokeWidth={8}
+                        strokeLinejoin="round"
+                        strokeLinecap="round"
+                        opacity={0.45}
+                      />
+                    ) : null}
                     <path
                       d={d}
                       fill="none"
                       stroke={stroke}
-                      strokeWidth={full ? 3 : 2.5}
+                      strokeWidth={isSel ? 4.5 : full ? 3 : 2}
                       strokeLinejoin="round"
                       strokeLinecap="round"
                     />
@@ -365,14 +395,16 @@ export function Board({
                     </path>
                     <polygon
                       points={arrow}
-                      fill={full || isSel ? color : `${color}b3`}
+                      fill={full || isSel ? color : `${color}66`}
+                      stroke={isSel ? "var(--text)" : "none"}
+                      strokeWidth={isSel ? 1.5 : 0}
                       pointerEvents="none"
                     />
                     <circle
                       cx={sx}
                       cy={sy}
-                      r={full ? 5 : 3.5}
-                      fill={full || isSel ? color : `${color}b3`}
+                      r={isSel ? (full ? 6 : 4.5) : full ? 5 : 3.5}
+                      fill={full || isSel ? color : `${color}66`}
                       stroke={isSel ? "var(--text)" : "var(--bg)"}
                       strokeWidth={isSel ? 2.5 : 1}
                       style={{ cursor: "pointer" }}
@@ -425,9 +457,14 @@ export function Board({
                     ) : (
                       <span style={{ fontWeight: 600 }}>{selected.displayName}</span>
                     )}
-                    {selected.kind === "full" && formatDuration(selected.elapsedSeconds) ? (
+                    {selected.kind === "full" ? (
                       <span style={{ color: selectedMember?.color ?? "var(--accent)", fontWeight: 600 }}>
-                        {formatDuration(selected.elapsedSeconds)}
+                        {[
+                          formatDuration(selected.elapsedSeconds),
+                          selected.percent < 100 ? `${selected.percent}%` : null,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
                       </span>
                     ) : null}
                     {selected.kind === "partial" ? (

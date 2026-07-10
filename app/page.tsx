@@ -5,7 +5,7 @@ import { colorFor } from "@/lib/colors";
 import { type TimelineMember } from "./Timeline";
 import { Avatar } from "./Avatar";
 import { Board } from "./Board";
-import { Distance, HeaderActions } from "./Settings";
+import { Distance, DistanceUnit, HeaderActions } from "./Settings";
 import canonicalJson from "@/loop/canonical-loop.json";
 
 export const dynamic = "force-dynamic";
@@ -60,13 +60,23 @@ export default async function HomePage() {
             }}
           >
             <span>Leaderboard</span>
-            <span>Loops</span>
+            {/* Column headers, matching the row column widths below */}
+            <span style={{ display: "flex", alignItems: "baseline" }}>
+              <span style={{ width: 66, textAlign: "right" }}>PR</span>
+              <span style={{ width: 62, textAlign: "right" }}>
+                <DistanceUnit />
+              </span>
+              <span style={{ width: 40, textAlign: "right" }}>Loop#</span>
+            </span>
           </h2>
           {leaderboard.map((r, i) => {
-            // The stripe doubles as the relative bar: a brighter section for
-            // full loops, continuing dimmer to the total score incl. partials.
-            const fullPct = maxTotal > 0 ? ((r.loops * 100) / maxTotal) * 100 : 0;
-            const totalPct = maxTotal > 0 ? (r.totalPercent / maxTotal) * 100 : 0;
+            // The stripe doubles as the relative bar, in three opacity tiers:
+            // clean 100% loops (brightest) → 98-99% tolerance fulls (slightly
+            // dimmer) → partial credit (faint), out to the total score.
+            const pctOf = (v: number) => (maxTotal > 0 ? (v / maxTotal) * 100 : 0);
+            const exactPct = pctOf(r.exactFullPercent);
+            const fullPct = pctOf(r.exactFullPercent + r.toleranceFullPercent);
+            const totalPct = pctOf(r.totalPercent);
             const c = colorFor(i);
             return (
               <div
@@ -76,7 +86,7 @@ export default async function HomePage() {
                   alignItems: "center",
                   gap: 10,
                   backgroundColor: "var(--panel)",
-                  backgroundImage: `linear-gradient(90deg, ${c}66 ${fullPct}%, ${c}2e ${fullPct}%, ${c}2e ${totalPct}%, transparent ${totalPct}%)`,
+                  backgroundImage: `linear-gradient(90deg, ${c}66 ${exactPct}%, ${c}59 ${exactPct}%, ${c}59 ${fullPct}%, ${c}2e ${fullPct}%, ${c}2e ${totalPct}%, transparent ${totalPct}%)`,
                   borderTop: "1px solid var(--border)",
                   padding: "8px 16px",
                 }}
@@ -100,7 +110,7 @@ export default async function HomePage() {
                       fontVariantNumeric: "tabular-nums",
                     }}
                   >
-                    {formatDuration(r.fastestSeconds) ? `PR ${formatDuration(r.fastestSeconds)}` : ""}
+                    {formatDuration(r.fastestSeconds) ?? ""}
                   </span>
                   <span
                     style={{
@@ -111,7 +121,7 @@ export default async function HomePage() {
                       fontVariantNumeric: "tabular-nums",
                     }}
                   >
-                    {r.totalPercent > 0 ? <Distance km={kmOf(r.totalPercent)} /> : ""}
+                    {r.totalPercent > 0 ? <Distance km={kmOf(r.totalPercent)} bare /> : ""}
                   </span>
                   <span
                     style={{

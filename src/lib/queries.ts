@@ -8,6 +8,10 @@ export interface LeaderboardRow {
   displayName: string;
   avatarUrl: string | null;
   loops: number;
+  /** Percent units from clean 100% loops. */
+  exactFullPercent: number;
+  /** Percent units from tolerance fulls (98-99%). */
+  toleranceFullPercent: number;
   /** Total credited loop travel in percent-of-loop units (full + partial). */
   totalPercent: number;
   /** Fastest single loop in seconds, if any. */
@@ -23,6 +27,8 @@ export async function getLeaderboard(): Promise<LeaderboardRow[]> {
       displayName: users.displayName,
       avatarUrl: users.avatarUrl,
       loops: sql<number>`coalesce(sum(case when ${loopEvents.kind} = 'full' then 1 else 0 end), 0)`,
+      exactFullPercent: sql<number>`coalesce(sum(case when ${loopEvents.kind} = 'full' and ${loopEvents.percent} >= 100 then ${loopEvents.percent} else 0 end), 0)`,
+      toleranceFullPercent: sql<number>`coalesce(sum(case when ${loopEvents.kind} = 'full' and ${loopEvents.percent} < 100 then ${loopEvents.percent} else 0 end), 0)`,
       totalPercent: sql<number>`coalesce(sum(${loopEvents.percent}), 0)`,
       fastestSeconds: sql<number | null>`min(${loopEvents.elapsedSeconds})`,
     })
@@ -40,6 +46,8 @@ export async function getLeaderboard(): Promise<LeaderboardRow[]> {
     displayName: r.displayName,
     avatarUrl: r.avatarUrl,
     loops: Number(r.loops),
+    exactFullPercent: Number(r.exactFullPercent),
+    toleranceFullPercent: Number(r.toleranceFullPercent),
     totalPercent: Number(r.totalPercent),
     fastestSeconds: r.fastestSeconds == null ? null : Number(r.fastestSeconds),
   }));

@@ -70,10 +70,18 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
 const KM_PER_MI = 1.609344;
 
-/** A distance in the viewer's preferred unit, e.g. "96.2 km" or "59.8 mi". */
-export function Distance({ km }: { km: number }) {
+/** A distance in the viewer's preferred unit, e.g. "96.2 km" or "59.8 mi".
+ *  With `bare`, just the number — for columns whose header carries the unit. */
+export function Distance({ km, bare = false }: { km: number; bare?: boolean }) {
   const { units } = useSettings();
-  return <>{units === "km" ? `${km.toFixed(1)} km` : `${(km / KM_PER_MI).toFixed(1)} mi`}</>;
+  const value = units === "km" ? km.toFixed(1) : (km / KM_PER_MI).toFixed(1);
+  return <>{bare ? value : `${value} ${units}`}</>;
+}
+
+/** The viewer's preferred distance unit, e.g. for column headers. */
+export function DistanceUnit() {
+  const { units } = useSettings();
+  return <>{units}</>;
 }
 
 function GearIcon({ size = 16 }: { size?: number }) {
