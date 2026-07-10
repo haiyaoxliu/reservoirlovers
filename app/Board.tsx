@@ -105,6 +105,15 @@ export function Board({
     setActiveUserId(e.userId);
   };
 
+  // Picking a member via their timeline row also selects their most recent
+  // event, so the detail panel and map focus land somewhere useful.
+  const selectUser = (userId: number) => {
+    const own = events.filter((ev) => ev.userId === userId);
+    const latest = own[own.length - 1];
+    if (latest) selectEvent(latest);
+    else setActiveUserId(userId);
+  };
+
   // Prev/next within the selected member's own event sequence (oldest first).
   const { prevEvent, nextEvent } = useMemo(() => {
     if (!selected) return { prevEvent: null, nextEvent: null };
@@ -250,7 +259,7 @@ export function Board({
           selected={selected}
           onSelect={selectEvent}
           activeUserId={activeUserId}
-          onSelectUser={setActiveUserId}
+          onSelectUser={selectUser}
           mask={days.length > 0 ? { start: windowStart, end: windowEnd } : null}
         />
 
