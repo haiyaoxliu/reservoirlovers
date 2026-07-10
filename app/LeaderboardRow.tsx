@@ -1,27 +1,60 @@
 "use client";
 
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useSettings } from "./Settings";
 import { TierMarks } from "./TierMarks";
 import { initials } from "./Avatar";
 
-/** Full name normally; compressed to all-caps initials when the rank &
- *  avatars chrome is hidden. */
+/**
+ * Member name that compresses to fit its space: full name → last name to its
+ * leading letter → first name too → gone. All-caps initials outright when
+ * the rank & avatars chrome is hidden.
+ */
 export function MemberName({ name }: { name: string }) {
   const { prefs } = useSettings();
+  const ref = useRef<HTMLSpanElement>(null);
+  const [level, setLevel] = useState(0);
+
+  const options = useMemo(() => {
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    const first = parts[0] ?? "";
+    const last = parts.length > 1 ? parts[parts.length - 1] : "";
+    return last
+      ? [name, `${first} ${last[0]}`, `${first[0]} ${last[0]}`, ""]
+      : [name, first[0] ?? "", ""];
+  }, [name]);
+
+  // Re-run the fit cascade whenever the allocated width changes.
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setLevel(0));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  // Step down one compression level per render until the text fits. The
+  // span's width comes from flex, not content, so this converges.
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (el && el.scrollWidth > el.clientWidth && level < options.length - 1) {
+      setLevel(level + 1);
+    }
+  });
+
   return (
     <span
+      ref={ref}
       className="lb-name"
       style={{
         flex: 1,
         fontWeight: 500,
         minWidth: 0,
         overflow: "hidden",
-        textOverflow: "ellipsis",
         whiteSpace: "nowrap",
         textTransform: prefs.rowChrome ? undefined : "uppercase",
       }}
     >
-      {prefs.rowChrome ? name : initials(name)}
+      {prefs.rowChrome ? options[Math.min(level, options.length - 1)] : initials(name)}
     </span>
   );
 }

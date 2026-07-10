@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import type { TimelineEvent } from "@/lib/queries";
 import { formatDuration } from "@/lib/queries";
-import { Timeline, type TimelineMember } from "./Timeline";
+import { Timeline, TIMELINE_RAIL_W, type TimelineMember } from "./Timeline";
 import { Avatar } from "./Avatar";
 import { ExternalLinkIcon } from "./ExternalLinkIcon";
 import { DetailOnly, Distance, useSettings } from "./Settings";
@@ -22,8 +22,10 @@ const loop = canonicalJson as {
   checkpoints: { x: number; y: number }[];
 };
 
-const fmtDay = (ms: number) =>
-  new Date(ms).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+const fmtDay = (ms: number) => {
+  const d = new Date(ms);
+  return `${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}`;
+};
 
 const headerStyle: React.CSSProperties = {
   margin: 0,
@@ -252,42 +254,59 @@ export function Board({
           mask={days.length > 0 ? { start: windowStart, end: windowEnd } : null}
         />
 
-        {/* Window picker, attached under the timeline it masks */}
+        {/* Window picker, attached under the timeline it masks. Its row
+            header sits in the same column as the Strava icon rail. */}
         {days.length > 0 ? (
           <div
             className="bleed"
             style={{
               display: "flex",
-              alignItems: "center",
-              gap: 12,
-              padding: "8px 16px",
+              alignItems: "stretch",
               background: "var(--panel)",
               borderBottom: "1px solid var(--border)",
             }}
           >
-            <input
-              type="range"
-              min={0}
-              max={maxStartIdx}
-              step={1}
-              value={startIdx}
-              onChange={(ev) => setStartIdx(Number(ev.target.value))}
-              disabled={maxStartIdx === 0}
-              aria-label="Date range shown on the map"
-              style={{ flex: 1 }}
-            />
-            {prefs.sliderDates ? (
-              <span
-                style={{
-                  fontSize: 11,
-                  color: "var(--muted)",
-                  whiteSpace: "nowrap",
-                  fontVariantNumeric: "tabular-nums",
-                }}
-              >
-                {fmtDay(windowStart)} – {fmtDay(windowEnd)}
-              </span>
-            ) : null}
+            <div
+              style={{
+                width: TIMELINE_RAIL_W,
+                flexShrink: 0,
+                background: "var(--panel-2)",
+                borderRight: "1px solid var(--border)",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                // Bottom-anchored with hidden overflow: if the cell ever gets
+                // too short, the start date clips first, keeping the end date.
+                justifyContent: "flex-end",
+                overflow: "hidden",
+                padding: "3px 0",
+                fontSize: 9,
+                lineHeight: "11px",
+                color: "var(--muted)",
+                fontVariantNumeric: "tabular-nums",
+              }}
+            >
+              {prefs.sliderDates ? (
+                <>
+                  <span>{fmtDay(windowStart)}</span>
+                  <span>–</span>
+                  <span>{fmtDay(windowEnd)}</span>
+                </>
+              ) : null}
+            </div>
+            <div style={{ flex: 1, display: "flex", alignItems: "center", padding: "8px 16px 8px 10px" }}>
+              <input
+                type="range"
+                min={0}
+                max={maxStartIdx}
+                step={1}
+                value={startIdx}
+                onChange={(ev) => setStartIdx(Number(ev.target.value))}
+                disabled={maxStartIdx === 0}
+                aria-label="Date range shown on the map"
+                style={{ flex: 1 }}
+              />
+            </div>
           </div>
         ) : null}
       </section>
