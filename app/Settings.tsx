@@ -312,7 +312,11 @@ function Segmented<T extends string>({
   );
 }
 
-/** Full-height tab buttons for section header stripes. */
+/**
+ * Compact full-height selector for section header stripes. Closed, it shows
+ * only the current value; tapping it fans the options out to the right in an
+ * overlay, so the header's other content never gets pushed around.
+ */
 export function HeaderTabs<T extends string>({
   value,
   options,
@@ -322,30 +326,75 @@ export function HeaderTabs<T extends string>({
   options: { v: T; label: string }[];
   onChange: (v: T) => void;
 }) {
+  const [open, setOpen] = useState(false);
+  const current = options.find((o) => o.v === value);
+
+  const tabStyle = (active: boolean): React.CSSProperties => ({
+    padding: "0 10px",
+    border: "none",
+    borderLeft: "1px solid var(--border)",
+    background: active ? "var(--mask)" : "transparent",
+    color: active ? "var(--text)" : "var(--muted)",
+    fontSize: 11,
+    fontWeight: active ? 600 : 400,
+    letterSpacing: 1,
+    textTransform: "uppercase",
+    cursor: "pointer",
+    whiteSpace: "nowrap",
+  });
+
   return (
-    <span style={{ display: "flex", alignSelf: "stretch" }}>
-      {options.map((o) => (
-        <button
-          key={o.v}
-          onClick={() => onChange(o.v)}
-          aria-pressed={value === o.v}
-          style={{
-            padding: "0 10px",
-            border: "none",
-            borderLeft: "1px solid var(--border)",
-            background: value === o.v ? "var(--mask)" : "transparent",
-            color: value === o.v ? "var(--text)" : "var(--muted)",
-            fontSize: 11,
-            fontWeight: value === o.v ? 600 : 400,
-            letterSpacing: 1,
-            textTransform: "uppercase",
-            cursor: "pointer",
-          }}
-        >
-          {o.label}
-        </button>
-      ))}
-      <span style={{ borderLeft: "1px solid var(--border)" }} />
+    <span style={{ position: "relative", display: "flex", alignSelf: "stretch" }}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        style={{
+          ...tabStyle(true),
+          borderRight: "1px solid var(--border)",
+          display: "flex",
+          alignItems: "center",
+          gap: 4,
+        }}
+      >
+        {current?.label}
+        <span style={{ fontSize: 8 }}>▾</span>
+      </button>
+      {open ? (
+        <>
+          {/* click-away backdrop */}
+          <span
+            onClick={() => setOpen(false)}
+            style={{ position: "fixed", inset: 0, zIndex: 9 }}
+          />
+          <span
+            style={{
+              position: "absolute",
+              left: "100%",
+              top: 0,
+              bottom: 0,
+              display: "flex",
+              zIndex: 10,
+              background: "var(--panel-2)",
+              border: "1px solid var(--border)",
+              borderLeft: "none",
+            }}
+          >
+            {options.map((o) => (
+              <button
+                key={o.v}
+                onClick={() => {
+                  onChange(o.v);
+                  setOpen(false);
+                }}
+                aria-pressed={value === o.v}
+                style={tabStyle(value === o.v)}
+              >
+                {o.label}
+              </button>
+            ))}
+          </span>
+        </>
+      ) : null}
     </span>
   );
 }
