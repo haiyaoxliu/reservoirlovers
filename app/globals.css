@@ -38,3 +38,9 @@ button {
   margin: 0 auto;
   padding: 20px 16px 64px;
 }
+
+/* Break out of the container's horizontal padding so stripes run edge to edge. */
+.bleed {
+  margin-left: -16px;
+  margin-right: -16px;
+}

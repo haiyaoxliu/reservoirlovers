@@ -48,51 +48,45 @@ export default async function HomePage() {
         <h2 style={{ fontSize: 15, color: "var(--muted)", textTransform: "uppercase", letterSpacing: 1 }}>
           Leaderboard
         </h2>
-        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 12 }}>
-          {leaderboard.map((r, i) => (
-            <div
-              key={r.userId}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-                background: "var(--panel)",
-                border: "1px solid #232a36",
-                borderRadius: 10,
-                padding: "10px 14px",
-              }}
-            >
-              <span style={{ width: 22, color: "var(--muted)", fontVariantNumeric: "tabular-nums" }}>
-                {i + 1}
-              </span>
-              <span
-                style={{ width: 12, height: 12, borderRadius: 6, background: colorFor(i), flexShrink: 0 }}
-              />
-              <Avatar url={r.avatarUrl} name={r.displayName} color={colorFor(i)} />
-              <span style={{ flex: 1, fontWeight: 500 }}>{r.displayName}</span>
-              <div style={{ textAlign: "right" }}>
-                <div style={{ fontVariantNumeric: "tabular-nums", fontSize: 18, fontWeight: 700 }}>
-                  {r.loops}
-                </div>
-                <div style={{ fontSize: 11, color: "var(--muted)" }}>
-                  {r.loops === 1 ? "loop" : "loops"}
-                  {formatDuration(r.fastestSeconds) ? ` · PR ${formatDuration(r.fastestSeconds)}` : ""}
+        <div className="bleed" style={{ marginTop: 12, borderBottom: "1px solid #232a36" }}>
+          {leaderboard.map((r, i) => {
+            // The stripe doubles as the relative bar: its background fills
+            // with the member's colour up to loops/topLoops.
+            const pct = topLoops > 0 ? (r.loops / topLoops) * 100 : 0;
+            return (
+              <div
+                key={r.userId}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  backgroundColor: "var(--panel)",
+                  backgroundImage: `linear-gradient(90deg, ${colorFor(i)}33 ${pct}%, transparent ${pct}%)`,
+                  borderTop: "1px solid #232a36",
+                  padding: "8px 16px",
+                }}
+              >
+                <span style={{ width: 18, color: "var(--muted)", fontVariantNumeric: "tabular-nums" }}>
+                  {i + 1}
+                </span>
+                <Avatar url={r.avatarUrl} name={r.displayName} color={colorFor(i)} />
+                <span style={{ flex: 1, fontWeight: 500, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {r.displayName}
+                </span>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontVariantNumeric: "tabular-nums", fontSize: 18, fontWeight: 700 }}>
+                    {r.loops}
+                  </div>
+                  <div style={{ fontSize: 11, color: "var(--muted)" }}>
+                    {r.loops === 1 ? "loop" : "loops"}
+                    {formatDuration(r.fastestSeconds) ? ` · PR ${formatDuration(r.fastestSeconds)}` : ""}
+                  </div>
                 </div>
               </div>
-              {/* Relative bar */}
-              <div style={{ width: 60, height: 6, background: "#232a36", borderRadius: 3, overflow: "hidden" }}>
-                <div
-                  style={{
-                    width: `${topLoops > 0 ? (r.loops / topLoops) * 100 : 0}%`,
-                    height: "100%",
-                    background: colorFor(i),
-                  }}
-                />
-              </div>
-            </div>
-          ))}
+            );
+          })}
           {leaderboard.length === 0 ? (
-            <p style={{ color: "var(--muted)" }}>No members yet.</p>
+            <p style={{ color: "var(--muted)", padding: "0 16px" }}>No members yet.</p>
           ) : null}
         </div>
       </section>

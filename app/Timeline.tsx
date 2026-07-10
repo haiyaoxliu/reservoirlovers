@@ -10,11 +10,12 @@ export interface TimelineMember {
   color: string;
 }
 
-const PX_PER_DAY = 42;
 const LANE_H = 46;
-const LABEL_W = 120;
-const PAD_DAYS = 1;
-const DAY_MS = 86400000;
+const LABEL_W = 100;
+/** Horizontal spacing between same-day dots in one lane. */
+const DOT_SPACING = 16;
+const MIN_COL_W = 44;
+const COL_PAD = 12;
 
 interface Positioned extends TimelineEvent {
   x: number;
@@ -29,34 +30,70 @@ export function Timeline({
 }) {
   const [selected, setSelected] = useState<Positioned | null>(null);
 
-  const { laneEvents, width, months, minT } = useMemo(() => {
+  // Ordinal axis: one column per calendar day that has at least one loop —
+  // empty stretches between run days take up no space at all.
+  const { laneEvents, width, ticks, minT } = useMemo(() => {
     if (events.length === 0) {
-      return { laneEvents: new Map<number, Positioned[]>(), width: 400, months: [], minT: 0 };
+      return { laneEvents: new Map<number, Positioned[]>(), width: 400, ticks: [], minT: 0 };
     }
-    const times = events.map((e) => new Date(e.eventTime).getTime());
-    const min = Math.min(...times) - PAD_DAYS * DAY_MS;
-    const max = Math.max(...times) + PAD_DAYS * DAY_MS;
-    const w = ((max - min) / DAY_MS) * PX_PER_DAY;
+    const dayKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+    const sorted = [...events]
+      .map((e) => ({ ...e, t: new Date(e.eventTime).getTime() }))
+      .sort((a, b) => a.t - b.t);
+
+    const days: { key: string; t: number }[] = [];
+    const dayIndex = new Map<string, number>();
+    for (const e of sorted) {
+      const k = dayKey(new Date(e.t));
+      if (!dayIndex.has(k)) {
+        dayIndex.set(k, days.length);
+        days.push({ key: k, t: e.t });
+      }
+    }
+
+    // A column widens if any member ran several loops that day.
+    const perDayLaneCount = days.map(() => new Map<number, number>());
+    for (const e of sorted) {
+      const counts = perDayLaneCount[dayIndex.get(dayKey(new Date(e.t)))!];
+      counts.set(e.userId, (counts.get(e.userId) ?? 0) + 1);
+    }
+    const colWidths = perDayLaneCount.map((counts) =>
+      Math.max(MIN_COL_W, Math.max(...counts.values()) * DOT_SPACING + COL_PAD),
+    );
+    const colLeft: number[] = [];
+    let acc = 0;
+    for (const w of colWidths) {
+      colLeft.push(acc);
+      acc += w;
+    }
 
     const byLane = new Map<number, Positioned[]>();
     for (const m of members) byLane.set(m.userId, []);
-    for (const e of events) {
-      const x = ((new Date(e.eventTime).getTime() - min) / DAY_MS) * PX_PER_DAY;
+    const placed = days.map(() => new Map<number, number>());
+    for (const e of sorted) {
+      const idx = dayIndex.get(dayKey(new Date(e.t)))!;
+      const total = perDayLaneCount[idx].get(e.userId)!;
+      const kth = placed[idx].get(e.userId) ?? 0;
+      placed[idx].set(e.userId, kth + 1);
+      // Same-day loops fan out around the column centre.
+      const x = colLeft[idx] + colWidths[idx] / 2 + (kth - (total - 1) / 2) * DOT_SPACING;
       byLane.get(e.userId)?.push({ ...e, x });
     }
 
-    const monthTicks: { x: number; label: string }[] = [];
-    const start = new Date(min);
-    const cursor = new Date(start.getFullYear(), start.getMonth(), 1);
-    while (cursor.getTime() <= max) {
-      const x = ((cursor.getTime() - min) / DAY_MS) * PX_PER_DAY;
-      monthTicks.push({
-        x,
-        label: cursor.toLocaleDateString("en-US", { month: "short", year: "2-digit" }),
-      });
-      cursor.setMonth(cursor.getMonth() + 1);
-    }
-    return { laneEvents: byLane, width: w, months: monthTicks, minT: min };
+    const dayTicks = days.map((d, i) => {
+      const date = new Date(d.t);
+      const prev = i > 0 ? new Date(days[i - 1].t) : null;
+      const newMonth =
+        !prev || prev.getMonth() !== date.getMonth() || prev.getFullYear() !== date.getFullYear();
+      return {
+        x: colLeft[i],
+        w: colWidths[i],
+        label: newMonth
+          ? date.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+          : String(date.getDate()),
+      };
+    });
+    return { laneEvents: byLane, width: acc, ticks: dayTicks, minT: sorted[0].t };
   }, [events, members]);
 
   const colorOf = useMemo(() => {
@@ -75,33 +112,40 @@ export function Timeline({
   return (
     <div style={{ position: "relative" }}>
       <div
+        className="bleed"
         style={{
           overflowX: "auto",
           overflowY: "hidden",
           WebkitOverflowScrolling: "touch",
-          border: "1px solid #232a36",
-          borderRadius: 12,
+          borderTop: "1px solid #232a36",
+          borderBottom: "1px solid #232a36",
           background: "var(--panel)",
         }}
       >
         <div style={{ position: "relative", width: LABEL_W + width, minWidth: "100%" }}>
-          {/* Month header */}
+          {/* Day markers — one per column, i.e. only where there is data */}
           <div style={{ position: "relative", height: 24, marginLeft: LABEL_W }}>
-            {months.map((mo, i) => (
+            {ticks.map((t, i) => (
               <div
                 key={i}
                 style={{
                   position: "absolute",
-                  left: mo.x,
-                  top: 4,
-                  fontSize: 11,
+                  left: t.x,
+                  width: t.w,
+                  top: 0,
+                  height: 24,
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "flex-end",
+                  fontSize: 10,
                   color: "var(--muted)",
-                  borderLeft: "1px solid #232a36",
-                  paddingLeft: 4,
-                  height: 16,
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
                 }}
               >
-                {mo.label}
+                <span style={{ paddingBottom: 1 }}>{t.label}</span>
+                <span style={{ width: 1, height: 4, background: "#333c4a" }} />
               </div>
             ))}
           </div>
