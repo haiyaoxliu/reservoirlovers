@@ -10,18 +10,11 @@ import {
   Distance,
   DistanceUnit,
   HeaderTabs,
+  RANGE_MS,
   useSettings,
-  type LeaderboardRange,
 } from "./Settings";
 import { LeaderboardRow, MemberName } from "./LeaderboardRow";
 import canonicalJson from "@/loop/canonical-loop.json";
-
-const RANGE_MS: Record<LeaderboardRange, number | null> = {
-  week: 7 * 86400000,
-  month: 30 * 86400000,
-  year: 365 * 86400000,
-  all: null,
-};
 
 /** Credited loop travel (percent units) as kilometres. */
 function kmOf(totalPercent: number): number {

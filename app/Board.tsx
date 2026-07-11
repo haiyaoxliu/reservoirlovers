@@ -6,7 +6,7 @@ import { formatDuration } from "@/lib/queries";
 import { Timeline, TIMELINE_RAIL_W, type TimelineMember } from "./Timeline";
 import { Avatar } from "./Avatar";
 import { ExternalLinkIcon } from "./ExternalLinkIcon";
-import { DetailOnly, Distance, HeaderTabs, useSettings } from "./Settings";
+import { DetailOnly, Distance, RANGE_MS, useSettings } from "./Settings";
 import canonicalJson from "@/loop/canonical-loop.json";
 
 const MAP_PAD_M = 30;
@@ -70,22 +70,26 @@ export function Board({
     return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
   };
 
-  // The window slides over the timeline's own date columns (days that have
-  // at least one event), showing up to WINDOW_DAYS columns at a time on the
-  // map. Indexing columns rather than wall-clock time keeps the slider and
-  // the mask perfectly in step. Defaults to the most recent columns.
+  // The map window's LENGTH follows the leaderboard range (week / month /
+  // year / all); the slider moves its start across the timeline's date
+  // columns, so slider and mask stay in step. Defaults to the most recent
+  // window.
+  const DAY_MS = 86400000;
   const days = useMemo(() => {
     const set = new Set<number>();
     for (const e of events) set.add(dayFloor(new Date(e.eventTime).getTime()));
     return [...set].sort((a, b) => a - b);
   }, [events]);
-  const { mapWindow, setMapWindow, prefs } = useSettings();
-  const windowDays = mapWindow === "all" ? Math.max(1, days.length) : mapWindow === "wide" ? 8 : 4;
-  const maxStartIdx = Math.max(0, days.length - windowDays);
+  const { range, prefs } = useSettings();
+  const spanMs = RANGE_MS[range];
+  const lastDay = days[days.length - 1] ?? 0;
+  // Latest useful start: the first column whose window reaches the last day.
+  const maxStartIdx =
+    spanMs == null ? 0 : Math.max(0, days.findIndex((d) => d + spanMs > lastDay));
   const [startIdxRaw, setStartIdx] = useState<number | null>(null);
-  const startIdx = Math.min(startIdxRaw ?? maxStartIdx, maxStartIdx);
+  const startIdx = spanMs == null ? 0 : Math.min(startIdxRaw ?? maxStartIdx, maxStartIdx);
   const windowStart = days[startIdx] ?? 0;
-  const windowEnd = days[Math.min(startIdx + windowDays, days.length) - 1] ?? 0;
+  const windowEnd = spanMs == null ? lastDay : dayFloor(windowStart + spanMs - DAY_MS);
 
   const mapEvents = useMemo(() => {
     return events.filter((e) => {
@@ -94,13 +98,21 @@ export function Board({
     });
   }, [events, windowStart, windowEnd]);
 
-  // Select an event: slide the window to cover its day if needed (centred
-  // when possible), and make its member the active one on the map.
+  // Select an event: slide the window to cover its day if needed (roughly
+  // centred), and make its member the active one on the map.
   const selectEvent = (e: TimelineEvent) => {
     setSelected(e);
-    const idx = days.indexOf(dayFloor(new Date(e.eventTime).getTime()));
-    if (idx >= 0 && (idx < startIdx || idx > startIdx + windowDays - 1)) {
-      setStartIdx(Math.max(0, Math.min(idx - Math.floor(windowDays / 2), maxStartIdx)));
+    if (spanMs != null) {
+      const d = dayFloor(new Date(e.eventTime).getTime());
+      if (d < windowStart || d > windowEnd) {
+        const target = dayFloor(d - spanMs / 2);
+        let idx = days.findIndex((x) => x >= target);
+        if (idx === -1) idx = days.length - 1;
+        // The window must actually contain the event's day.
+        while (idx > 0 && days[idx] > d) idx--;
+        while (idx < days.length - 1 && days[idx] + spanMs <= d) idx++;
+        setStartIdx(Math.min(idx, maxStartIdx));
+      }
     }
     setActiveUserId(e.userId);
   };
@@ -335,22 +347,9 @@ export function Board({
                 gap: 12,
               }}
             >
-              <span style={{ display: "flex", alignItems: "stretch" }}>
-                <span
-                  style={{ display: "flex", alignItems: "center", padding: "6px 12px 6px 16px" }}
-                >
-                  Map
-                </span>
-                {/* Window-width tabs: date columns shown at a time */}
-                <HeaderTabs
-                  value={mapWindow}
-                  options={[
-                    { v: "normal", label: "4" },
-                    { v: "wide", label: "8" },
-                    { v: "all", label: "All" },
-                  ]}
-                  onChange={setMapWindow}
-                />
+              {/* Window length follows the leaderboard range tabs */}
+              <span style={{ display: "flex", alignItems: "center", padding: "6px 12px 6px 16px" }}>
+                Map
               </span>
               {activeUserId != null && memberOf.get(activeUserId) ? (
                 <span

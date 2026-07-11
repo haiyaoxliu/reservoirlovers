@@ -4,8 +4,16 @@ import { createContext, useContext, useEffect, useState } from "react";
 
 type Units = "km" | "mi";
 type Theme = "dark" | "light";
-type MapWindow = "normal" | "wide" | "all";
 export type LeaderboardRange = "week" | "month" | "year" | "all";
+
+/** Window length per range; null = the full data span. Shared by the
+ *  leaderboard aggregation and the map/timeline window. */
+export const RANGE_MS: Record<LeaderboardRange, number | null> = {
+  week: 7 * 86400000,
+  month: 30 * 86400000,
+  year: 365 * 86400000,
+  all: null,
+};
 
 /** Individually toggleable pieces of secondary chrome. All default to shown. */
 export interface DetailPrefs {
@@ -39,25 +47,20 @@ const DEFAULT_PREFS: DetailPrefs = {
 const SettingsContext = createContext<{
   units: Units;
   theme: Theme;
-  /** How many timeline date columns the map window spans: normal 4, wide 8. */
-  mapWindow: MapWindow;
-  /** Time range the leaderboard scores cover. */
+  /** Time range for both the leaderboard scores and the map window. */
   range: LeaderboardRange;
   prefs: DetailPrefs;
   setUnits: (u: Units) => void;
   setTheme: (t: Theme) => void;
-  setMapWindow: (w: MapWindow) => void;
   setRange: (r: LeaderboardRange) => void;
   setPref: (key: keyof DetailPrefs, value: boolean) => void;
 }>({
   units: "km",
   theme: "dark",
-  mapWindow: "normal",
   range: "all",
   prefs: DEFAULT_PREFS,
   setUnits: () => {},
   setTheme: () => {},
-  setMapWindow: () => {},
   setRange: () => {},
   setPref: () => {},
 });
@@ -67,7 +70,6 @@ export const useSettings = () => useContext(SettingsContext);
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [units, setUnitsState] = useState<Units>("km");
   const [theme, setThemeState] = useState<Theme>("dark");
-  const [mapWindow, setMapWindowState] = useState<MapWindow>("normal");
   const [range, setRangeState] = useState<LeaderboardRange>("all");
   const [prefs, setPrefsState] = useState<DetailPrefs>(DEFAULT_PREFS);
 
@@ -77,8 +79,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     try {
       if (localStorage.getItem("rl-units") === "mi") setUnitsState("mi");
       if (localStorage.getItem("rl-theme") === "light") setThemeState("light");
-      const win = localStorage.getItem("rl-map-window");
-      if (win === "wide" || win === "all") setMapWindowState(win);
       const rng = localStorage.getItem("rl-range");
       if (rng === "week" || rng === "month" || rng === "year") setRangeState(rng);
       const stored = JSON.parse(localStorage.getItem("rl-detail") ?? "{}");
@@ -97,12 +97,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     document.documentElement.dataset.theme = t;
     try {
       localStorage.setItem("rl-theme", t);
-    } catch {}
-  };
-  const setMapWindow = (w: MapWindow) => {
-    setMapWindowState(w);
-    try {
-      localStorage.setItem("rl-map-window", w);
     } catch {}
   };
   const setRange = (r: LeaderboardRange) => {
@@ -126,18 +120,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <SettingsContext.Provider
-      value={{
-        units,
-        theme,
-        mapWindow,
-        range,
-        prefs,
-        setUnits,
-        setTheme,
-        setMapWindow,
-        setRange,
-        setPref,
-      }}
+      value={{ units, theme, range, prefs, setUnits, setTheme, setRange, setPref }}
     >
       {children}
     </SettingsContext.Provider>
