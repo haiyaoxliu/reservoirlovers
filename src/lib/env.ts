@@ -37,4 +37,8 @@ export const env = {
     const v = process.env.ADMIN_ATHLETE_ID;
     return v ? Number(v) : null;
   },
+  /** Shared password for the view-only tier; unset disables it. */
+  get viewerPassword() {
+    return process.env.VIEWER_PASSWORD || null;
+  },
 };

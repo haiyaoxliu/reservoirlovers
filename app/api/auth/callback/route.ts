@@ -7,7 +7,7 @@ import { env } from "@/lib/env";
 import { encryptToken } from "@/lib/crypto";
 import { getSession } from "@/lib/session";
 import { consumeInvite, isInviteValid } from "@/lib/invite";
-import { exchangeCode, OAUTH_SCOPES } from "@/strava/client";
+import { exchangeCode } from "@/strava/client";
 
 export const runtime = "nodejs";
 
@@ -25,6 +25,16 @@ export async function GET(req: NextRequest) {
   if (!code) return fail("Authorization was cancelled");
   if (!state || state !== expectedState) return fail("Invalid OAuth state");
   store.delete("rl_oauth_state");
+
+  // Strava echoes the scopes the user actually granted (they can uncheck
+  // boxes on the consent screen). Without activity access every fetch 401s,
+  // so refuse the connection with a pointer to the fix.
+  const grantedScopes = url.searchParams.get("scope") ?? "";
+  if (!grantedScopes.includes("activity:read")) {
+    return fail(
+      "Strava connected without activity access — please reconnect and keep “View data about your activities” checked",
+    );
+  }
 
   const { tokens, athlete } = await exchangeCode(code);
   const athleteId = athlete.id;
@@ -55,7 +65,7 @@ export async function GET(req: NextRequest) {
     accessToken: encryptToken(tokens.accessToken),
     refreshToken: encryptToken(tokens.refreshToken),
     tokenExpiresAt: tokens.expiresAt,
-    scopes: OAUTH_SCOPES,
+    scopes: grantedScopes,
     deauthorizedAt: null,
     isAdmin: env.adminAthleteId === athleteId ? 1 : existing?.isAdmin ?? 0,
   };

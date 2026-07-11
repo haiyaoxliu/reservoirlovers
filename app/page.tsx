@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getSession } from "@/lib/session";
+import { getSession, isActiveViewer } from "@/lib/session";
 import { getLeaderboard, getTimeline } from "@/lib/queries";
 import { colorFor } from "@/lib/colors";
 import { type TimelineMember } from "./Timeline";
@@ -11,7 +11,10 @@ export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
   const session = await getSession();
-  if (!session.athleteId) redirect("/login");
+  // Members see everything; viewers (shared-password tier) see the
+  // leaderboard only. A viewer session goes stale when the password rotates.
+  const isMember = Boolean(session.athleteId);
+  if (!isMember && !isActiveViewer(session)) redirect("/login");
 
   const [leaderboard, timeline] = await Promise.all([getLeaderboard(), getTimeline()]);
 
@@ -38,13 +41,15 @@ export default async function HomePage() {
 
       <Leaderboard members={members} events={timeline} />
 
-      <Board
-        events={timeline}
-        members={members}
-        currentUserId={
-          leaderboard.find((r) => r.stravaAthleteId === session.athleteId)?.userId ?? null
-        }
-      />
+      {isMember ? (
+        <Board
+          events={timeline}
+          members={members}
+          currentUserId={
+            leaderboard.find((r) => r.stravaAthleteId === session.athleteId)?.userId ?? null
+          }
+        />
+      ) : null}
     </div>
   );
 }
