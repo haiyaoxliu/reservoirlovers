@@ -5,6 +5,8 @@ import { colorFor } from "@/lib/colors";
 import { type TimelineMember } from "./Timeline";
 import { Board } from "./Board";
 import { Leaderboard } from "./Leaderboard";
+import { LockedBoard } from "./LockedBoard";
+import { demoBoardData } from "./demoData";
 import { HeaderActions } from "./Settings";
 
 export const dynamic = "force-dynamic";
@@ -49,7 +51,11 @@ export default async function HomePage() {
             leaderboard.find((r) => r.stravaAthleteId === session.athleteId)?.userId ?? null
           }
         />
-      ) : null}
+      ) : (
+        // Viewers get a teaser: the same board, but blurred fake data under a
+        // lock overlay — real timeline/map detail stays member-only.
+        <LockedBoard {...demoBoardData(Date.now())} />
+      )}
     </div>
   );
 }
