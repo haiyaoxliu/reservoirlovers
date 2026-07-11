@@ -413,7 +413,9 @@ export function Timeline({
                   {evs.map((e) => {
                     const full = e.kind === "full";
                     const exact = full && e.percent >= 100;
-                    const r = full ? 7 : 5;
+                    // Radius scales smoothly with completion; 98%+ (all
+                    // fulls) share the maximum size.
+                    const r = 3 + 4 * (Math.min(e.percent, 98) / 98);
                     const isSel = selected?.id === e.id;
                     const date = new Date(e.eventTime).toLocaleDateString();
                     return (

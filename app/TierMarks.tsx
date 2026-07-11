@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { useSettings } from "./Settings";
 
 export interface TierMark {
@@ -22,9 +23,23 @@ export interface TierMark {
 export function TierMarks({ marks }: { marks: TierMark[] }) {
   const { prefs } = useSettings();
   const clean = !prefs.statColumns;
-  // Estimated text width as % of a ~350px bar (5px/char small, 13px large).
-  const smallWidthOf = (m: TierMark) => m.label.length * 1.5 + 0.5;
-  const widthOf = (m: TierMark) => m.label.length * (clean ? 3.6 : 1.5) + 0.5;
+
+  // Collision boxes need real pixels: a fixed %-per-character is only right
+  // at one bar width. Measure the row and convert.
+  const probeRef = useRef<HTMLSpanElement>(null);
+  const [barPx, setBarPx] = useState(375);
+  useEffect(() => {
+    const el = probeRef.current?.parentElement;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setBarPx(el.clientWidth || 375));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  // ~5px/char at the 8.5px font, ~14px/char at the 24px font, plus padding.
+  const pctPerPx = 100 / barPx;
+  const smallWidthOf = (m: TierMark) => (m.label.length * 5 + 6) * pctPerPx;
+  const widthOf = (m: TierMark) =>
+    (m.label.length * (clean ? 14 : 5) + (clean ? 10 : 6)) * pctPerPx;
 
   const ordered = [...marks].filter((mk) => mk.pct > 0).sort((a, b) => a.pct - b.pct);
 
@@ -52,6 +67,7 @@ export function TierMarks({ marks }: { marks: TierMark[] }) {
 
   return (
     <>
+      <span ref={probeRef} style={{ position: "absolute", width: 0, height: 0 }} />
       {placed.map(({ mk, x, left, small }) => {
         const big = clean && !small;
         return (

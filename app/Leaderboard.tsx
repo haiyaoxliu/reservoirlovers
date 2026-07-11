@@ -132,7 +132,9 @@ export function Leaderboard({
         </DetailOnly>
         {rows.map(({ m, loops, exact, tolerance, total, fastest }, i) => (
           <LeaderboardRow
-            key={m.userId}
+            // Range in the key remounts rows on timeframe switch so no
+            // stale marks or name-fit state carries over.
+            key={`${range}:${m.userId}`}
             color={m.color}
             maxTotal={maxTotal}
             exactFullPercent={exact}
