@@ -126,6 +126,24 @@ export default async function AdminPage() {
 
   return (
     <div className="container">
+      <a
+        href="/"
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 6,
+          margin: "8px 0 16px",
+          padding: "6px 12px",
+          fontSize: 13,
+          color: "var(--muted)",
+          border: "1px solid var(--border-btn)",
+          borderRadius: 8,
+          textDecoration: "none",
+        }}
+      >
+        ← Leaderboard
+      </a>
+
       <h1 style={{ fontSize: 22, margin: "8px 0 20px" }}>Maintenance</h1>
       <AdminTools
         refreshAll={refreshAllAction}
