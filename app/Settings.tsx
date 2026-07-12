@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 type Units = "km" | "mi";
 type Theme = "dark" | "light";
@@ -465,9 +466,72 @@ const DETAIL_TOGGLES: { key: keyof DetailPrefs; label: string }[] = [
   { key: "userHighlight", label: "User highlight" },
 ];
 
+/** "Refresh profile" row in the settings modal: re-pulls the member's Strava
+ *  avatar/name and recent GPS data. The server allows one refresh per 24h. */
+function RefreshProfileRow() {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+
+  const run = async () => {
+    setBusy(true);
+    setNote(null);
+    try {
+      const res = await fetch("/api/profile/refresh", { method: "POST" });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setNote(json.error ?? "Refresh failed");
+      } else {
+        setNote(
+          json.processed > 0
+            ? `Updated — ${json.processed} activit${json.processed === 1 ? "y" : "ies"} processed`
+            : "Profile updated",
+        );
+        router.refresh();
+      }
+    } catch {
+      setNote("Refresh failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <>
+      <Row label="Profile">
+        <button
+          onClick={run}
+          disabled={busy}
+          style={{
+            padding: "6px 16px",
+            fontSize: 13,
+            border: "1px solid var(--border-btn)",
+            borderRadius: 8,
+            cursor: busy ? "default" : "pointer",
+            background: "transparent",
+            color: "var(--muted)",
+            opacity: busy ? 0.6 : 1,
+          }}
+        >
+          {busy ? "Refreshing…" : "Refresh"}
+        </button>
+      </Row>
+      <p style={{ fontSize: 12, color: "var(--muted)", margin: "-6px 0 12px" }}>
+        {note ?? "Pulls your latest Strava photo, name, and recent runs. Once per day."}
+      </p>
+    </>
+  );
+}
+
 /** Header buttons: admin invites (admins only), settings, and sign-out. The
  *  detail-visibility button is hidden for now; its modal code remains. */
-export function HeaderActions({ isAdmin = false }: { isAdmin?: boolean }) {
+export function HeaderActions({
+  isAdmin = false,
+  isMember = false,
+}: {
+  isAdmin?: boolean;
+  isMember?: boolean;
+}) {
   const [openSettings, setOpenSettings] = useState(false);
   const [openDetail, setOpenDetail] = useState(false);
   const { units, theme, prefs, setUnits, setTheme, setPref } = useSettings();
@@ -561,6 +625,7 @@ export function HeaderActions({ isAdmin = false }: { isAdmin?: boolean }) {
               onChange={setTheme}
             />
           </Row>
+          {isMember ? <RefreshProfileRow /> : null}
           {/* Map window and leaderboard range moved to their section headers */}
         </Modal>
       ) : null}

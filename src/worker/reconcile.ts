@@ -2,7 +2,7 @@ import { and, eq, isNull, ne } from "drizzle-orm";
 import { db } from "../db/index";
 import { activities, users, type User } from "../db/schema";
 import { ALGO_VERSION } from "../loop/constants";
-import { listActivities, RateLimitError } from "../strava/client";
+import { getAthlete, listActivities, RateLimitError } from "../strava/client";
 import { prefilter } from "../strava/prefilter";
 import { getValidAccessToken } from "../strava/tokens";
 import { processActivity } from "./process-activity";
@@ -11,14 +11,17 @@ export interface ReconcileResult {
   usersScanned: number;
   activitiesSeen: number;
   processed: number;
+  profilesRefreshed: number;
   rateLimited: boolean;
 }
 
-interface ReconcileOptions {
+export interface ReconcileOptions {
   /** Only consider activities started after this epoch (seconds). */
   after?: number;
   /** Max pages of 30 activities to pull per user. */
   maxPages?: number;
+  /** Also re-pull each user's Strava profile (name, avatar). */
+  refreshProfiles?: boolean;
 }
 
 /**
@@ -36,6 +39,7 @@ export async function reconcileAll(opts: ReconcileOptions = {}): Promise<Reconci
     usersScanned: 0,
     activitiesSeen: 0,
     processed: 0,
+    profilesRefreshed: 0,
     rateLimited: false,
   };
 
@@ -55,6 +59,22 @@ export async function reconcileAll(opts: ReconcileOptions = {}): Promise<Reconci
   return result;
 }
 
+/** Reconcile a single user; same options, rate-limit errors propagate. */
+export async function reconcileOne(
+  user: User,
+  opts: ReconcileOptions = {},
+): Promise<ReconcileResult> {
+  const result: ReconcileResult = {
+    usersScanned: 1,
+    activitiesSeen: 0,
+    processed: 0,
+    profilesRefreshed: 0,
+    rateLimited: false,
+  };
+  await reconcileUser(user, opts, result);
+  return result;
+}
+
 async function reconcileUser(
   user: User,
   opts: ReconcileOptions,
@@ -62,6 +82,17 @@ async function reconcileUser(
 ): Promise<void> {
   const token = await getValidAccessToken(user);
   const maxPages = opts.maxPages ?? 1;
+
+  if (opts.refreshProfiles) {
+    const athlete = await getAthlete(token);
+    const displayName =
+      [athlete.firstname, athlete.lastname].filter(Boolean).join(" ") || user.displayName;
+    await db
+      .update(users)
+      .set({ displayName, avatarUrl: athlete.profile ?? user.avatarUrl })
+      .where(eq(users.id, user.id));
+    result.profilesRefreshed++;
+  }
 
   for (let page = 1; page <= maxPages; page++) {
     const summaries = await listActivities(token, page, 30, opts.after);

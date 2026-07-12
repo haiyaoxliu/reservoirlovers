@@ -38,6 +38,7 @@ export default async function HomePage() {
           isAdmin={
             leaderboard.find((r) => r.stravaAthleteId === session.athleteId)?.isAdmin ?? false
           }
+          isMember={isMember}
         />
       </header>
 

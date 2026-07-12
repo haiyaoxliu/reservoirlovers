@@ -108,6 +108,11 @@ async function apiGet<T>(path: string, accessToken: string): Promise<T> {
   return (await res.json()) as T;
 }
 
+/** Fetch the authenticated athlete's current profile (name, avatar). */
+export function getAthlete(accessToken: string): Promise<AthleteProfile> {
+  return apiGet("/athlete", accessToken);
+}
+
 export type ActivityDetail = ActivitySummary & {
   id?: number;
   name?: string;

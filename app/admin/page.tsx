@@ -6,10 +6,15 @@ import { invites, users } from "@/db/schema";
 import { env } from "@/lib/env";
 import { getSession } from "@/lib/session";
 import { createInvite } from "@/lib/invite";
+import { reconcileAll, type ReconcileResult } from "@/worker/reconcile";
 import { ExternalLinkIcon } from "../ExternalLinkIcon";
 import { CopyButton } from "../CopyButton";
+import { AdminTools } from "./AdminTools";
 
 export const dynamic = "force-dynamic";
+// Server actions on this page (refresh/backfill) call the Strava API in a
+// loop; give them the full function window.
+export const maxDuration = 60;
 
 async function requireAdmin() {
   const session = await getSession();
@@ -28,6 +33,47 @@ async function createInviteAction() {
   revalidatePath("/admin");
 }
 
+function summarize(r: ReconcileResult, withProfiles: boolean): string {
+  const parts = [
+    `${r.usersScanned} member${r.usersScanned === 1 ? "" : "s"}`,
+    ...(withProfiles ? [`${r.profilesRefreshed} profiles refreshed`] : []),
+    `${r.activitiesSeen} activities seen`,
+    `${r.processed} (re)processed`,
+  ];
+  return (
+    parts.join(", ") +
+    (r.rateLimited ? " — Strava rate limit hit, run again in ~15 min to continue." : ".")
+  );
+}
+
+async function refreshAllAction(): Promise<string> {
+  "use server";
+  await requireAdmin();
+  try {
+    const result = await reconcileAll({
+      refreshProfiles: true,
+      maxPages: 3,
+      after: Math.floor(Date.now() / 1000) - 30 * 24 * 3600,
+    });
+    return summarize(result, true);
+  } catch (err) {
+    console.error("admin refresh-all failed", err);
+    return "Refresh failed — check the server logs.";
+  }
+}
+
+async function backfillAllAction(): Promise<string> {
+  "use server";
+  await requireAdmin();
+  try {
+    const result = await reconcileAll({ maxPages: 100 });
+    return summarize(result, false);
+  } catch (err) {
+    console.error("admin backfill failed", err);
+    return "Backfill failed — check the server logs.";
+  }
+}
+
 export default async function AdminPage() {
   await requireAdmin();
   // Attach the Strava account that redeemed each invite.
@@ -44,6 +90,9 @@ export default async function AdminPage() {
 
   return (
     <div className="container">
+      <h1 style={{ fontSize: 22, margin: "8px 0 20px" }}>Maintenance</h1>
+      <AdminTools refreshAll={refreshAllAction} backfillAll={backfillAllAction} />
+
       <h1 style={{ fontSize: 22, margin: "8px 0 20px" }}>Invites</h1>
 
       <form action={createInviteAction} style={{ marginBottom: 24 }}>
