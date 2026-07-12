@@ -13,7 +13,7 @@ export default async function InvitePage({
 
   return (
     <div className="container" style={{ textAlign: "center", paddingTop: 80 }}>
-      <h1 style={{ fontSize: 36, marginBottom: 8 }}>🏃 Reservoir Lovers</h1>
+      <h1 style={{ fontSize: 36, marginBottom: 8 }}>Reservoir Lovers</h1>
       {valid ? (
         <>
           <p style={{ color: "var(--muted)", maxWidth: 440, margin: "0 auto 28px" }}>

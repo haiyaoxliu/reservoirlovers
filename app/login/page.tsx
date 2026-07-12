@@ -10,7 +10,7 @@ export default async function LoginPage({
   const viewerEnabled = Boolean(env.viewerPassword);
   return (
     <div className="container" style={{ textAlign: "center", paddingTop: 80 }}>
-      <h1 style={{ fontSize: 40, marginBottom: 8 }}>🏃 Reservoir Lovers</h1>
+      <h1 style={{ fontSize: 40, marginBottom: 8 }}>Reservoir Lovers</h1>
       <p style={{ color: "var(--muted)", maxWidth: 440, margin: "0 auto 28px" }}>
         Loop-counting for the run club, around the Central Park Reservoir.
       </p>
