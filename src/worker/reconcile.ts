@@ -13,6 +13,8 @@ export interface ReconcileResult {
   processed: number;
   profilesRefreshed: number;
   rateLimited: boolean;
+  /** True if the run stopped at opts.deadlineMs; re-run to continue. */
+  outOfTime: boolean;
 }
 
 export interface ReconcileOptions {
@@ -22,7 +24,15 @@ export interface ReconcileOptions {
   maxPages?: number;
   /** Also re-pull each user's Strava profile (name, avatar). */
   refreshProfiles?: boolean;
+  /** Stop cleanly once Date.now() passes this (epoch ms). Serverless callers
+   *  set it inside their function limit so the platform never kills a run
+   *  mid-flight; progress is kept and a re-run resumes where this one left
+   *  off (processed activities are skipped). */
+  deadlineMs?: number;
 }
+
+const pastDeadline = (opts: ReconcileOptions) =>
+  opts.deadlineMs !== undefined && Date.now() > opts.deadlineMs;
 
 /**
  * Catch webhook misses and reprocess stale activities. For each active member,
@@ -41,10 +51,15 @@ export async function reconcileAll(opts: ReconcileOptions = {}): Promise<Reconci
     processed: 0,
     profilesRefreshed: 0,
     rateLimited: false,
+    outOfTime: false,
   };
 
   for (const user of active) {
     if (!user.accessToken || !user.refreshToken) continue;
+    if (pastDeadline(opts)) {
+      result.outOfTime = true;
+      break;
+    }
     result.usersScanned++;
     try {
       await reconcileUser(user, opts, result);
@@ -70,6 +85,7 @@ export async function reconcileOne(
     processed: 0,
     profilesRefreshed: 0,
     rateLimited: false,
+    outOfTime: false,
   };
   await reconcileUser(user, opts, result);
   return result;
@@ -95,10 +111,20 @@ async function reconcileUser(
   }
 
   for (let page = 1; page <= maxPages; page++) {
+    if (pastDeadline(opts)) {
+      result.outOfTime = true;
+      return;
+    }
     const summaries = await listActivities(token, page, 30, opts.after);
     if (summaries.length === 0) break;
 
     for (const summary of summaries) {
+      // Streams + matching per activity is the expensive unit, so check the
+      // clock here too.
+      if (pastDeadline(opts)) {
+        result.outOfTime = true;
+        return;
+      }
       result.activitiesSeen++;
 
       const existing = await db.query.activities.findFirst({

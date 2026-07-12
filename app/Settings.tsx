@@ -483,9 +483,10 @@ function RefreshProfileRow() {
         setNote(json.error ?? "Refresh failed");
       } else {
         setNote(
-          json.processed > 0
+          (json.processed > 0
             ? `Updated — ${json.processed} activit${json.processed === 1 ? "y" : "ies"} processed`
-            : "Profile updated",
+            : "Profile updated") +
+            (json.outOfTime ? "; the rest will sync automatically" : ""),
         );
         router.refresh();
       }

@@ -59,6 +59,9 @@ export async function POST() {
       refreshProfiles: true,
       maxPages: 3,
       after: Math.floor(Date.now() / 1000) - LOOKBACK_S,
+      // Stop before Vercel's 60s kill so the response always makes it out;
+      // anything left over is caught by webhooks and the daily cron.
+      deadlineMs: Date.now() + 45_000,
     });
     return NextResponse.json(result);
   } catch (err) {

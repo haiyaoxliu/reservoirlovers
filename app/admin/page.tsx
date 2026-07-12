@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, isNull } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db/index";
@@ -6,7 +6,8 @@ import { invites, users } from "@/db/schema";
 import { env } from "@/lib/env";
 import { getSession } from "@/lib/session";
 import { createInvite } from "@/lib/invite";
-import { reconcileAll, type ReconcileResult } from "@/worker/reconcile";
+import { reconcileAll, reconcileOne, type ReconcileResult } from "@/worker/reconcile";
+import { RateLimitError } from "@/strava/client";
 import { ExternalLinkIcon } from "../ExternalLinkIcon";
 import { CopyButton } from "../CopyButton";
 import { AdminTools } from "./AdminTools";
@@ -40,11 +41,18 @@ function summarize(r: ReconcileResult, withProfiles: boolean): string {
     `${r.activitiesSeen} activities seen`,
     `${r.processed} (re)processed`,
   ];
-  return (
-    parts.join(", ") +
-    (r.rateLimited ? " — Strava rate limit hit, run again in ~15 min to continue." : ".")
-  );
+  const followUp = r.rateLimited
+    ? " — Strava rate limit hit, run again in ~15 min to continue."
+    : r.outOfTime
+      ? " — out of time for one run, click again to continue."
+      : ".";
+  return parts.join(", ") + followUp;
 }
+
+/** Leave ~15s of the 60s function limit for token refreshes, the in-flight
+ *  activity, and response serialization — Vercel killing the action mid-run
+ *  loses the summary and surfaces as a raw error in the browser. */
+const actionDeadline = () => Date.now() + 45_000;
 
 async function refreshAllAction(): Promise<string> {
   "use server";
@@ -54,6 +62,7 @@ async function refreshAllAction(): Promise<string> {
       refreshProfiles: true,
       maxPages: 3,
       after: Math.floor(Date.now() / 1000) - 30 * 24 * 3600,
+      deadlineMs: actionDeadline(),
     });
     return summarize(result, true);
   } catch (err) {
@@ -66,7 +75,7 @@ async function backfillAllAction(): Promise<string> {
   "use server";
   await requireAdmin();
   try {
-    const result = await reconcileAll({ maxPages: 100 });
+    const result = await reconcileAll({ maxPages: 100, deadlineMs: actionDeadline() });
     return summarize(result, false);
   } catch (err) {
     console.error("admin backfill failed", err);
@@ -74,8 +83,35 @@ async function backfillAllAction(): Promise<string> {
   }
 }
 
+async function backfillUserAction(athleteId: number): Promise<string> {
+  "use server";
+  await requireAdmin();
+  const user = await db.query.users.findFirst({
+    where: eq(users.stravaAthleteId, athleteId),
+  });
+  if (!user || user.deauthorizedAt || !user.accessToken || !user.refreshToken) {
+    return "That member has no connected Strava account.";
+  }
+  try {
+    const result = await reconcileOne(user, { maxPages: 100, deadlineMs: actionDeadline() });
+    return summarize(result, false);
+  } catch (err) {
+    // Unlike reconcileAll, the single-user variant propagates rate limits.
+    if (err instanceof RateLimitError) {
+      return "Strava rate limit hit — run again in ~15 min to continue.";
+    }
+    console.error(`admin backfill failed for athlete ${athleteId}`, err);
+    return "Backfill failed — check the server logs.";
+  }
+}
+
 export default async function AdminPage() {
   await requireAdmin();
+  const members = await db
+    .select({ athleteId: users.stravaAthleteId, name: users.displayName })
+    .from(users)
+    .where(isNull(users.deauthorizedAt))
+    .orderBy(users.displayName);
   // Attach the Strava account that redeemed each invite.
   const rows = await db
     .select({
@@ -91,7 +127,12 @@ export default async function AdminPage() {
   return (
     <div className="container">
       <h1 style={{ fontSize: 22, margin: "8px 0 20px" }}>Maintenance</h1>
-      <AdminTools refreshAll={refreshAllAction} backfillAll={backfillAllAction} />
+      <AdminTools
+        refreshAll={refreshAllAction}
+        backfillAll={backfillAllAction}
+        backfillUser={backfillUserAction}
+        members={members}
+      />
 
       <h1 style={{ fontSize: 22, margin: "8px 0 20px" }}>Invites</h1>
 
