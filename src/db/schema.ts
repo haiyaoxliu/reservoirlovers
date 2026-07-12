@@ -36,9 +36,6 @@ export const users = pgTable("users", {
   scopes: text("scopes"),
   isAdmin: integer("is_admin").notNull().default(0),
   deauthorizedAt: timestamp("deauthorized_at", { withTimezone: true }),
-  /** When the member last used the self-serve profile refresh; the server
-   *  allows one refresh per 24h. */
-  profileRefreshedAt: timestamp("profile_refreshed_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

@@ -29,6 +29,13 @@
       "when": 1783881224312,
       "tag": "0003_late_hellfire_club",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1783899015335,
+      "tag": "0004_long_ultimates",
+      "breakpoints": true
     }
   ]
 }
