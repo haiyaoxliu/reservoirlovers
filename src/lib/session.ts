@@ -10,6 +10,11 @@ export interface SessionData {
   /** View-only tier: leaderboard access, granted by redeeming a visitor invite.
    *  No Strava, no detailed board. */
   viewer?: boolean;
+  /** Epoch ms the visitor invite was redeemed. Also the eviction line for the
+   *  retired shared-password viewer tier: those old cookies carry viewer=true
+   *  but no viewerAt, so they no longer validate — no SESSION_SECRET rotation
+   *  needed to shed them. */
+  viewerAt?: number;
   /** In-flight WebAuthn challenge (base64url) for a passkey ceremony. */
   webauthnChallenge?: string;
   /** Epoch ms of this member's last successful passkey verification. The
@@ -31,9 +36,11 @@ export function isFreshPasskey(session: SessionData): boolean {
   );
 }
 
-/** True if this session is a view-only visitor (redeemed a visitor invite). */
+/** True if this session is a view-only visitor (redeemed a visitor invite).
+ *  Requires the redemption stamp so pre-invite (shared-password era) viewer
+ *  cookies are rejected. */
 export function isActiveViewer(session: SessionData): boolean {
-  return session.viewer === true;
+  return session.viewer === true && typeof session.viewerAt === "number";
 }
 
 export function sessionOptions(): SessionOptions {

@@ -23,6 +23,7 @@ export async function POST(req: NextRequest) {
   }
   const session = await getSession();
   session.viewer = true;
+  session.viewerAt = Date.now();
   await session.save();
   return NextResponse.redirect(new URL("/", env.siteUrl), 303);
 }
