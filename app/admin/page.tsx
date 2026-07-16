@@ -5,7 +5,7 @@ import { db } from "@/db/index";
 import { invites, users } from "@/db/schema";
 import { env } from "@/lib/env";
 import { getSession, isFreshPasskey } from "@/lib/session";
-import { listCredentials } from "@/lib/passkey";
+import { deleteCredential, listCredentials } from "@/lib/passkey";
 import { MAX_SLOTS, countCommittedSlots, createInvite, releaseInvite } from "@/lib/invite";
 import { reconcileAll, reconcileOne, type ReconcileResult } from "@/worker/reconcile";
 import { RateLimitError, deauthorize } from "@/strava/client";
@@ -16,6 +16,7 @@ import { AdminTools } from "./AdminTools";
 import { NewInvite } from "./NewInvite";
 import { PasskeyGate } from "./PasskeyGate";
 import { PasskeyEnroll } from "./PasskeyEnroll";
+import { PasskeyList } from "./PasskeyList";
 
 export const dynamic = "force-dynamic";
 // Server actions on this page (refresh/backfill) call the Strava API in a
@@ -168,6 +169,25 @@ async function removeMemberAction(athleteId: number): Promise<string> {
   return revokeConfirmed
     ? `${user.displayName} disconnected — a Strava slot is freed, their invite reopens, and their history stays on the board.`
     : `${user.displayName} marked disconnected and their invite reopened, but Strava didn't confirm the revoke. If the slot isn't freed, they may need to remove the app from their Strava settings.`;
+}
+
+/** Remove one of the admin's own passkeys. Refuses to delete the last one —
+ *  that would silently drop /admin back to Strava-only bootstrap enrollment, so
+ *  we make the admin register a replacement first. */
+async function removePasskeyAction(id: number): Promise<string> {
+  "use server";
+  const admin = await requireVerifiedAdmin();
+  const creds = await listCredentials(admin.id);
+  if (creds.length <= 1) {
+    return "That's your only passkey — add another before removing it, or you'll be back to first-time setup.";
+  }
+  const target = creds.find((c) => c.id === id);
+  const removed = await deleteCredential(admin.id, id);
+  if (removed === 0) {
+    return "That passkey was already removed.";
+  }
+  revalidatePath("/admin");
+  return `Removed “${target?.label ?? "Passkey"}”.`;
 }
 
 export default async function AdminPage() {
@@ -367,30 +387,16 @@ export default async function AdminPage() {
         Required to open this page. Register a spare on another device so a lost
         one doesn&apos;t lock you out.
       </p>
-      <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 16 }}>
-        {credentials.map((c) => (
-          <div
-            key={c.id}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              background: "var(--panel)",
-              border: "1px solid var(--border)",
-              borderRadius: 8,
-              padding: "8px 12px",
-              fontSize: 13,
-            }}
-          >
-            <span style={{ flex: 1, minWidth: 0 }}>{c.label ?? "Passkey"}</span>
-            <span style={{ color: "var(--muted)", fontSize: 12, flexShrink: 0 }}>
-              {c.lastUsedAt
-                ? `last used ${c.lastUsedAt.toISOString().slice(0, 10)}`
-                : `added ${c.createdAt.toISOString().slice(0, 10)}`}
-            </span>
-          </div>
-        ))}
-      </div>
+      <PasskeyList
+        passkeys={credentials.map((c) => ({
+          id: c.id,
+          label: c.label ?? "Passkey",
+          meta: c.lastUsedAt
+            ? `last used ${c.lastUsedAt.toISOString().slice(0, 10)}`
+            : `added ${c.createdAt.toISOString().slice(0, 10)}`,
+        }))}
+        removePasskey={removePasskeyAction}
+      />
       <PasskeyEnroll />
     </div>
   );

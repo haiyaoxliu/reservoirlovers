@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type { AuthenticatorTransportFuture } from "@simplewebauthn/server";
 import { db } from "../db/index";
 import { adminCredentials, users, type AdminCredential, type User } from "../db/schema";
@@ -38,6 +38,17 @@ export async function saveCredential(input: {
     transports: input.transports ? JSON.stringify(input.transports) : null,
     label: input.label ?? null,
   });
+}
+
+/** Delete one of the admin's own passkeys by its row id. Scoped to userId so a
+ *  caller can only ever remove their own credentials. Returns the number of rows
+ *  removed (0 if it was already gone or never belonged to them). */
+export async function deleteCredential(userId: number, id: number): Promise<number> {
+  const removed = await db
+    .delete(adminCredentials)
+    .where(and(eq(adminCredentials.id, id), eq(adminCredentials.userId, userId)))
+    .returning({ id: adminCredentials.id });
+  return removed.length;
 }
 
 /** Bump the stored signature counter and last-used time after a successful
