@@ -26,6 +26,8 @@ export interface TimelineMember {
   displayName: string;
   avatarUrl: string | null;
   color: string;
+  /** ISO date the member's Strava was disconnected, or null if active. */
+  deauthorizedAt: string | null;
 }
 
 export function stravaProfileUrl(athleteId: number): string {

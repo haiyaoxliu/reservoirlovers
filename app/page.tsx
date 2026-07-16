@@ -28,6 +28,7 @@ export default async function HomePage() {
     displayName: r.displayName,
     avatarUrl: r.avatarUrl,
     color: colorFor(i),
+    deauthorizedAt: r.deauthorizedAt,
   }));
 
   return (

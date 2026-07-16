@@ -21,6 +21,13 @@ function kmOf(totalPercent: number): number {
   return (totalPercent / 100) * (canonicalJson.totalMeters / 1000);
 }
 
+/** ISO timestamp → yyyy/mm/dd in the viewer's local zone. */
+function fmtYmd(iso: string): string {
+  const d = new Date(iso);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}/${p(d.getMonth() + 1)}/${p(d.getDate())}`;
+}
+
 /**
  * The leaderboard, aggregated client-side from the raw events so the range
  * setting (past week / month / year / all time) applies instantly. Member
@@ -141,7 +148,22 @@ export function Leaderboard({
               </span>
               <Avatar url={m.avatarUrl} name={m.displayName} color={m.color} />
             </DetailOnly>
-            <MemberName name={m.displayName} />
+            <MemberName name={m.displayName} dimmed={Boolean(m.deauthorizedAt)} />
+            {/* Disconnected members keep their history but are frozen: greyed
+                name plus the date their Strava was unlinked. */}
+            {m.deauthorizedAt ? (
+              <span
+                title={`Strava disconnected — last update ${fmtYmd(m.deauthorizedAt)}`}
+                style={{
+                  flexShrink: 0,
+                  fontSize: 11,
+                  color: "var(--muted)",
+                  fontVariantNumeric: "tabular-nums",
+                }}
+              >
+                {fmtYmd(m.deauthorizedAt)}
+              </span>
+            ) : null}
             {/* Fixed-width right-aligned columns so PR / km / loops line up
                 vertically across rows; hidden with the headers' labels. */}
             <DetailOnly pref="statColumns">

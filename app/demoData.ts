@@ -34,6 +34,7 @@ export function demoBoardData(now: number): {
     displayName,
     avatarUrl: null,
     color: colorFor(i),
+    deauthorizedAt: null,
   }));
 
   const events: TimelineEvent[] = [];

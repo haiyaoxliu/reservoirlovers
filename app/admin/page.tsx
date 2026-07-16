@@ -7,7 +7,8 @@ import { env } from "@/lib/env";
 import { getSession } from "@/lib/session";
 import { createInvite } from "@/lib/invite";
 import { reconcileAll, reconcileOne, type ReconcileResult } from "@/worker/reconcile";
-import { RateLimitError } from "@/strava/client";
+import { RateLimitError, deauthorize } from "@/strava/client";
+import { getValidAccessToken } from "@/strava/tokens";
 import { ExternalLinkIcon } from "../ExternalLinkIcon";
 import { CopyButton } from "../CopyButton";
 import { AdminTools } from "./AdminTools";
@@ -105,6 +106,47 @@ async function backfillUserAction(athleteId: number): Promise<string> {
   }
 }
 
+/** Disconnect a member: revoke on Strava (freeing a slot against the
+ *  10-athlete cap), drop the stored tokens, and mark them deauthorized. Their
+ *  activities and loop history stay put — the leaderboard greys the row and
+ *  shows the disconnect date. */
+async function removeMemberAction(athleteId: number): Promise<string> {
+  "use server";
+  await requireAdmin();
+  const user = await db.query.users.findFirst({
+    where: eq(users.stravaAthleteId, athleteId),
+  });
+  if (!user || user.deauthorizedAt) {
+    return "That member is already disconnected.";
+  }
+  // Best-effort revoke on Strava's side — that's what actually frees the slot.
+  // A dead token (already revoked) throws here; the slot is free either way,
+  // so we still mark the member disconnected but flag the uncertainty.
+  let revokeConfirmed = true;
+  if (user.accessToken && user.refreshToken) {
+    try {
+      await deauthorize(await getValidAccessToken(user));
+    } catch (err) {
+      console.error(`admin remove: Strava revoke failed for athlete ${athleteId}`, err);
+      revokeConfirmed = false;
+    }
+  }
+  await db
+    .update(users)
+    .set({
+      accessToken: null,
+      refreshToken: null,
+      tokenExpiresAt: null,
+      deauthorizedAt: new Date(),
+    })
+    .where(eq(users.id, user.id));
+  revalidatePath("/admin");
+  revalidatePath("/");
+  return revokeConfirmed
+    ? `${user.displayName} disconnected — a Strava slot is freed and their history stays on the board.`
+    : `${user.displayName} marked disconnected, but Strava didn't confirm the revoke. If the slot isn't freed, they may need to remove the app from their Strava settings.`;
+}
+
 export default async function AdminPage() {
   await requireAdmin();
   const members = await db
@@ -149,6 +191,7 @@ export default async function AdminPage() {
         refreshAll={refreshAllAction}
         backfillAll={backfillAllAction}
         backfillUser={backfillUserAction}
+        removeMember={removeMemberAction}
         members={members}
       />
 

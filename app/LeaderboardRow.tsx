@@ -10,7 +10,7 @@ import { initials } from "./Avatar";
  * leading letter → first name too → gone. All-caps initials outright when
  * the rank & avatars chrome is hidden.
  */
-export function MemberName({ name }: { name: string }) {
+export function MemberName({ name, dimmed = false }: { name: string; dimmed?: boolean }) {
   const { prefs } = useSettings();
   const ref = useRef<HTMLSpanElement>(null);
   const [level, setLevel] = useState(0);
@@ -52,6 +52,7 @@ export function MemberName({ name }: { name: string }) {
         overflow: "hidden",
         whiteSpace: "nowrap",
         textTransform: prefs.rowChrome ? undefined : "uppercase",
+        color: dimmed ? "var(--muted)" : undefined,
       }}
     >
       {prefs.rowChrome ? options[Math.min(level, options.length - 1)] : initials(name)}

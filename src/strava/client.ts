@@ -3,6 +3,7 @@ import type { GpsFix } from "../loop/matcher";
 import type { ActivitySummary } from "./prefilter";
 
 const OAUTH_URL = "https://www.strava.com/oauth/token";
+const DEAUTHORIZE_URL = "https://www.strava.com/oauth/deauthorize";
 const API_BASE = "https://www.strava.com/api/v3";
 
 export const OAUTH_SCOPES = "read,activity:read_all";
@@ -86,6 +87,22 @@ export async function refreshToken(refresh: string): Promise<TokenSet> {
     throw new Error(`Strava token refresh failed: ${res.status} ${await res.text()}`);
   }
   return toTokenSet((await res.json()) as TokenResponse);
+}
+
+/**
+ * Revoke this app's access for one athlete, freeing a slot against Strava's
+ * authenticated-athlete cap. A 401 means the token was already invalid (the
+ * athlete revoked it themselves) — the slot is already free, so we treat that
+ * as success.
+ */
+export async function deauthorize(accessToken: string): Promise<void> {
+  const res = await fetch(DEAUTHORIZE_URL, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok && res.status !== 401) {
+    throw new Error(`Strava deauthorize failed: ${res.status} ${await res.text()}`);
+  }
 }
 
 export class RateLimitError extends Error {

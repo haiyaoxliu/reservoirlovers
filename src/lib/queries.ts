@@ -9,6 +9,9 @@ export interface LeaderboardRow {
   avatarUrl: string | null;
   loops: number;
   isAdmin: boolean;
+  /** ISO timestamp the member's Strava was disconnected, or null if active.
+   *  Disconnected members keep their history on the board, shown greyed out. */
+  deauthorizedAt: string | null;
   /** Percent units from clean 100% loops. */
   exactFullPercent: number;
   /** Percent units from tolerance fulls (98-99%). */
@@ -28,6 +31,7 @@ export async function getLeaderboard(): Promise<LeaderboardRow[]> {
       displayName: users.displayName,
       avatarUrl: users.avatarUrl,
       isAdmin: users.isAdmin,
+      deauthorizedAt: users.deauthorizedAt,
       loops: sql<number>`coalesce(sum(case when ${loopEvents.kind} = 'full' then 1 else 0 end), 0)`,
       exactFullPercent: sql<number>`coalesce(sum(case when ${loopEvents.kind} = 'full' and ${loopEvents.percent} >= 100 then ${loopEvents.percent} else 0 end), 0)`,
       toleranceFullPercent: sql<number>`coalesce(sum(case when ${loopEvents.kind} = 'full' and ${loopEvents.percent} < 100 then ${loopEvents.percent} else 0 end), 0)`,
@@ -36,7 +40,14 @@ export async function getLeaderboard(): Promise<LeaderboardRow[]> {
     })
     .from(users)
     .leftJoin(loopEvents, eq(loopEvents.userId, users.id))
-    .groupBy(users.id, users.stravaAthleteId, users.displayName, users.avatarUrl, users.isAdmin)
+    .groupBy(
+      users.id,
+      users.stravaAthleteId,
+      users.displayName,
+      users.avatarUrl,
+      users.isAdmin,
+      users.deauthorizedAt,
+    )
     .orderBy(
       desc(sql`coalesce(sum(case when ${loopEvents.kind} = 'full' then 1 else 0 end), 0)`),
       desc(sql`coalesce(sum(${loopEvents.percent}), 0)`),
@@ -48,6 +59,7 @@ export async function getLeaderboard(): Promise<LeaderboardRow[]> {
     displayName: r.displayName,
     avatarUrl: r.avatarUrl,
     isAdmin: r.isAdmin === 1,
+    deauthorizedAt: r.deauthorizedAt?.toISOString() ?? null,
     loops: Number(r.loops),
     exactFullPercent: Number(r.exactFullPercent),
     toleranceFullPercent: Number(r.toleranceFullPercent),
