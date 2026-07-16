@@ -16,6 +16,8 @@
     "db:migrate": "tsx --env-file-if-exists=.env.local scripts/migrate.ts",
     "backfill": "tsx --env-file-if-exists=.env.local scripts/backfill.ts",
     "invites:release": "tsx --env-file-if-exists=.env.local scripts/release-orphan-invites.ts",
+    "invites:purge": "tsx --env-file-if-exists=.env.local scripts/purge-open-invites.ts",
+    "secret:rotate": "tsx scripts/rotate-session-secret.ts",
     "webhook:subscribe": "tsx --env-file-if-exists=.env.local scripts/webhook-subscribe.ts"
   },
   "dependencies": {

@@ -1,24 +1,25 @@
 import { and, eq } from "drizzle-orm";
 import type { AuthenticatorTransportFuture } from "@simplewebauthn/server";
 import { db } from "../db/index";
-import { adminCredentials, users, type AdminCredential, type User } from "../db/schema";
+import { passkeyCredentials, users, type PasskeyCredential, type User } from "../db/schema";
 import { getSession } from "./session";
 
-/** The admin User for the current session, or null if the caller isn't the
- *  Strava-authenticated admin. Used by the passkey API routes, which respond
- *  with JSON rather than redirecting like the admin page does. */
-export async function getAdminUser(): Promise<User | null> {
+/** The connected member for the current session, or null if there's no Strava
+ *  session. Any member (not just the admin) can register/verify a passkey, so
+ *  the passkey API routes authorize against this. */
+export async function getSessionUser(): Promise<User | null> {
   const session = await getSession();
   if (!session.athleteId) return null;
-  const user = await db.query.users.findFirst({
-    where: eq(users.stravaAthleteId, session.athleteId),
-  });
-  return user && user.isAdmin === 1 ? user : null;
+  return (
+    (await db.query.users.findFirst({
+      where: eq(users.stravaAthleteId, session.athleteId),
+    })) ?? null
+  );
 }
 
-export async function listCredentials(userId: number): Promise<AdminCredential[]> {
-  return db.query.adminCredentials.findMany({
-    where: eq(adminCredentials.userId, userId),
+export async function listCredentials(userId: number): Promise<PasskeyCredential[]> {
+  return db.query.passkeyCredentials.findMany({
+    where: eq(passkeyCredentials.userId, userId),
   });
 }
 
@@ -30,7 +31,7 @@ export async function saveCredential(input: {
   transports?: AuthenticatorTransportFuture[];
   label?: string | null;
 }): Promise<void> {
-  await db.insert(adminCredentials).values({
+  await db.insert(passkeyCredentials).values({
     userId: input.userId,
     credentialId: input.credentialId,
     publicKey: input.publicKey,
@@ -40,14 +41,14 @@ export async function saveCredential(input: {
   });
 }
 
-/** Delete one of the admin's own passkeys by its row id. Scoped to userId so a
+/** Delete one of a member's own passkeys by its row id. Scoped to userId so a
  *  caller can only ever remove their own credentials. Returns the number of rows
  *  removed (0 if it was already gone or never belonged to them). */
 export async function deleteCredential(userId: number, id: number): Promise<number> {
   const removed = await db
-    .delete(adminCredentials)
-    .where(and(eq(adminCredentials.id, id), eq(adminCredentials.userId, userId)))
-    .returning({ id: adminCredentials.id });
+    .delete(passkeyCredentials)
+    .where(and(eq(passkeyCredentials.id, id), eq(passkeyCredentials.userId, userId)))
+    .returning({ id: passkeyCredentials.id });
   return removed.length;
 }
 
@@ -55,14 +56,14 @@ export async function deleteCredential(userId: number, id: number): Promise<numb
  *  assertion — the counter guards against cloned-authenticator replay. */
 export async function touchCredential(credentialId: string, counter: number): Promise<void> {
   await db
-    .update(adminCredentials)
+    .update(passkeyCredentials)
     .set({ counter, lastUsedAt: new Date() })
-    .where(eq(adminCredentials.credentialId, credentialId));
+    .where(eq(passkeyCredentials.credentialId, credentialId));
 }
 
 /** Parse the stored transports JSON back into the typed array. */
 export function credentialTransports(
-  row: AdminCredential,
+  row: PasskeyCredential,
 ): AuthenticatorTransportFuture[] | undefined {
   if (!row.transports) return undefined;
   try {

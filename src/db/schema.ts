@@ -36,6 +36,9 @@ export const users = pgTable("users", {
   scopes: text("scopes"),
   isAdmin: integer("is_admin").notNull().default(0),
   deauthorizedAt: timestamp("deauthorized_at", { withTimezone: true }),
+  /** Last time this member ran a self-service backfill; gates the once-a-day
+   *  cooldown on the /account backfill button. Null = never. */
+  lastBackfillAt: timestamp("last_backfill_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -113,16 +116,32 @@ export const webhookEvents = pgTable(
 
 export const invites = pgTable("invites", {
   code: text("code").primaryKey(),
+  /** 'member' invites let someone connect Strava and take a leaderboard slot
+   *  (capped at MAX_SLOTS); 'visitor' invites grant one-time view-only access
+   *  and don't count against the cap. */
+  kind: text("kind").notNull().default("member"),
   createdBy: bigint("created_by", { mode: "number" }),
   usedByAthleteId: bigint("used_by_athlete_id", { mode: "number" }),
   usedAt: timestamp("used_at", { withTimezone: true }),
+  /** Set the first time a member invite is redeemed and never cleared. Locks
+   *  the code to that athlete: after the member is removed the invite reopens,
+   *  but only that same Strava account can redeem it again — a guessed code from
+   *  a different athlete is rejected. Null on visitor invites and never-redeemed
+   *  member invites. */
+  boundAthleteId: bigint("bound_athlete_id", { mode: "number" }),
   expiresAt: timestamp("expires_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-/** WebAuthn passkeys that gate the admin site (second factor on top of the
- *  Strava-admin session). One row per registered authenticator. */
-export const adminCredentials = pgTable("admin_credentials", {
+/** Invite kind literal — mirrors the `kind` column's allowed values. */
+export type InviteKind = "member" | "visitor";
+
+/** WebAuthn passkeys — a member's second factor on top of their Strava session.
+ *  Required to load the detailed board (and to reach /admin, for admins). One
+ *  row per registered authenticator. The SQL table is still named
+ *  `admin_credentials` (it predates the member rollout); renaming it in place
+ *  would risk the interactive-rename drop/recreate, so only the TS symbol moved. */
+export const passkeyCredentials = pgTable("admin_credentials", {
   id: bigserial("id", { mode: "number" }).primaryKey(),
   userId: bigint("user_id", { mode: "number" })
     .notNull()
@@ -143,4 +162,4 @@ export type User = typeof users.$inferSelect;
 export type Activity = typeof activities.$inferSelect;
 export type LoopEventRow = typeof loopEvents.$inferSelect;
 export type Invite = typeof invites.$inferSelect;
-export type AdminCredential = typeof adminCredentials.$inferSelect;
+export type PasskeyCredential = typeof passkeyCredentials.$inferSelect;

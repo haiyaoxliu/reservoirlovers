@@ -5,7 +5,7 @@ import { env } from "@/lib/env";
 import { getSession } from "@/lib/session";
 import {
   credentialTransports,
-  getAdminUser,
+  getSessionUser,
   listCredentials,
   touchCredential,
 } from "@/lib/passkey";
@@ -13,8 +13,8 @@ import {
 export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
-  const admin = await getAdminUser();
-  if (!admin) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const user = await getSessionUser();
+  if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const session = await getSession();
   const expectedChallenge = session.webauthnChallenge;
@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const creds = await listCredentials(admin.id);
+  const creds = await listCredentials(user.id);
   const row = creds.find((c) => c.credentialId === body.response?.id);
   if (!row) {
     return NextResponse.json({ error: "unknown credential" }, { status: 400 });
@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
 
   await touchCredential(row.credentialId, verification.authenticationInfo.newCounter);
   session.webauthnChallenge = undefined;
-  session.adminPasskeyAt = Date.now();
+  session.passkeyAt = Date.now();
   await session.save();
   return NextResponse.json({ ok: true });
 }

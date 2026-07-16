@@ -2,11 +2,17 @@ import { desc, eq, isNull } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db/index";
-import { invites, users } from "@/db/schema";
+import { invites, users, type InviteKind } from "@/db/schema";
 import { env } from "@/lib/env";
 import { getSession, isFreshPasskey } from "@/lib/session";
 import { deleteCredential, listCredentials } from "@/lib/passkey";
-import { MAX_SLOTS, countCommittedSlots, createInvite, releaseInvite } from "@/lib/invite";
+import {
+  MAX_SLOTS,
+  countCommittedSlots,
+  createInvite,
+  purgeOpenInvites,
+  releaseInvite,
+} from "@/lib/invite";
 import { reconcileAll, reconcileOne, type ReconcileResult } from "@/worker/reconcile";
 import { RateLimitError, deauthorize } from "@/strava/client";
 import { getValidAccessToken } from "@/strava/tokens";
@@ -14,9 +20,10 @@ import { ExternalLinkIcon } from "../ExternalLinkIcon";
 import { CopyButton } from "../CopyButton";
 import { AdminTools } from "./AdminTools";
 import { NewInvite } from "./NewInvite";
-import { PasskeyGate } from "./PasskeyGate";
-import { PasskeyEnroll } from "./PasskeyEnroll";
-import { PasskeyList } from "./PasskeyList";
+import { RevokeOpenInvites } from "./RevokeOpenInvites";
+import { PasskeyGate } from "../PasskeyGate";
+import { PasskeyEnroll } from "../PasskeyEnroll";
+import { PasskeyList } from "../PasskeyList";
 
 export const dynamic = "force-dynamic";
 // Server actions on this page (refresh/backfill) call the Strava API in a
@@ -45,15 +52,28 @@ async function requireVerifiedAdmin() {
   return user;
 }
 
-async function createInviteAction(): Promise<string | null> {
+async function createInviteAction(kind: InviteKind): Promise<string | null> {
   "use server";
   const admin = await requireVerifiedAdmin();
-  const code = await createInvite(admin.id);
+  const code = await createInvite(admin.id, kind);
   if (!code) {
     return `At the ${MAX_SLOTS}-athlete cap — remove a member or use an open invite before creating another.`;
   }
   revalidatePath("/admin");
   return null;
+}
+
+/** Delete every never-redeemed invite to clear guessable open links. Keeps
+ *  athlete-locked (previously redeemed) invites so removed members keep their
+ *  reapply link. */
+async function purgeOpenInvitesAction(): Promise<string> {
+  "use server";
+  await requireVerifiedAdmin();
+  const removed = await purgeOpenInvites();
+  revalidatePath("/admin");
+  return removed.length === 0
+    ? "No open invites to revoke."
+    : `Revoked ${removed.length} open invite${removed.length === 1 ? "" : "s"}.`;
 }
 
 function summarize(r: ReconcileResult, withProfiles: boolean): string {
@@ -190,6 +210,78 @@ async function removePasskeyAction(id: number): Promise<string> {
   return `Removed “${target?.label ?? "Passkey"}”.`;
 }
 
+/** One invite link row. Member invites link to the Strava account that redeemed
+ *  them; visitor invites just show a "viewer" tag. Unused rows offer a copy
+ *  button. */
+function InviteRow({
+  url,
+  used,
+  athleteId,
+  athleteName,
+}: {
+  url: string;
+  used: boolean;
+  athleteId?: number | null;
+  athleteName?: string | null;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        background: "var(--panel)",
+        border: "1px solid var(--border)",
+        borderRadius: 8,
+        padding: "8px 12px",
+        opacity: used ? 0.6 : 1,
+      }}
+    >
+      {/* Truncates on narrow screens; the copy button carries the full link */}
+      <code
+        style={{
+          fontSize: 13,
+          flex: 1,
+          minWidth: 0,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {url}
+      </code>
+      {used ? (
+        athleteId ? (
+          <a
+            href={`https://www.strava.com/athletes/${athleteId}`}
+            target="_blank"
+            rel="noreferrer"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 5,
+              color: "var(--text)",
+              fontSize: 13,
+              whiteSpace: "nowrap",
+              flexShrink: 0,
+            }}
+          >
+            {athleteName ?? `Athlete ${athleteId}`}
+            <ExternalLinkIcon size={11} />
+          </a>
+        ) : (
+          <span style={{ fontSize: 13, color: "var(--muted)", flexShrink: 0 }}>viewer</span>
+        )
+      ) : (
+        <CopyButton text={url} />
+      )}
+      <span style={{ fontSize: 12, color: used ? "#ff6b6b" : "var(--gold)", flexShrink: 0 }}>
+        {used ? "used" : "open"}
+      </span>
+    </div>
+  );
+}
+
 export default async function AdminPage() {
   const admin = await requireAdmin();
 
@@ -212,16 +304,25 @@ export default async function AdminPage() {
     .orderBy(users.displayName);
   const committedSlots = await countCommittedSlots();
   // Attach the Strava account that redeemed each invite.
-  const rows = await db
+  const allRows = await db
     .select({
       code: invites.code,
+      kind: invites.kind,
       usedByAthleteId: invites.usedByAthleteId,
+      usedAt: invites.usedAt,
+      boundAthleteId: invites.boundAthleteId,
       usedByName: users.displayName,
     })
     .from(invites)
     .leftJoin(users, eq(users.stravaAthleteId, invites.usedByAthleteId))
     .orderBy(desc(invites.createdAt))
     .limit(50);
+  // Member invites carry a Strava slot; visitor invites are view-only.
+  const rows = allRows.filter((r) => r.kind !== "visitor");
+  const visitorRows = allRows.filter((r) => r.kind === "visitor");
+  const openCount = allRows.filter(
+    (r) => !r.boundAthleteId && !r.usedByAthleteId && !r.usedAt,
+  ).length;
   // Members who connected without redeeming an invite (e.g. the admin who set
   // the app up). They still occupy a Strava slot, so surface them alongside the
   // invite links — otherwise the list undercounts the real committed total.
@@ -313,72 +414,33 @@ export default async function AdminPage() {
             <span style={{ fontSize: 12, color: "#ff6b6b", flexShrink: 0 }}>used</span>
           </div>
         ))}
-        {rows.map((inv) => {
-          const url = `${env.siteUrl}/invite/${inv.code}`;
-          const used = Boolean(inv.usedByAthleteId);
-          return (
-            <div
-              key={inv.code}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                background: "var(--panel)",
-                border: "1px solid var(--border)",
-                borderRadius: 8,
-                padding: "8px 12px",
-                opacity: used ? 0.6 : 1,
-              }}
-            >
-              {/* Truncates on narrow screens; the copy button carries the
-                  full link */}
-              <code
-                style={{
-                  fontSize: 13,
-                  flex: 1,
-                  minWidth: 0,
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {url}
-              </code>
-              {used ? (
-                <a
-                  href={`https://www.strava.com/athletes/${inv.usedByAthleteId}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 5,
-                    color: "var(--text)",
-                    fontSize: 13,
-                    whiteSpace: "nowrap",
-                    flexShrink: 0,
-                  }}
-                >
-                  {inv.usedByName ?? `Athlete ${inv.usedByAthleteId}`}
-                  <ExternalLinkIcon size={11} />
-                </a>
-              ) : (
-                <CopyButton text={url} />
-              )}
-              <span
-                style={{
-                  fontSize: 12,
-                  color: used ? "#ff6b6b" : "var(--gold)",
-                  flexShrink: 0,
-                }}
-              >
-                {used ? "used" : "open"}
-              </span>
-            </div>
-          );
-        })}
+        {rows.map((inv) => (
+          <InviteRow
+            key={inv.code}
+            url={`${env.siteUrl}/invite/${inv.code}`}
+            used={Boolean(inv.usedByAthleteId)}
+            athleteId={inv.usedByAthleteId}
+            athleteName={inv.usedByName}
+          />
+        ))}
         {rows.length === 0 && directSlots.length === 0 ? (
-          <p style={{ color: "var(--muted)" }}>No invites yet.</p>
+          <p style={{ color: "var(--muted)" }}>No member invites yet.</p>
+        ) : null}
+      </div>
+
+      <RevokeOpenInvites openCount={openCount} revoke={purgeOpenInvitesAction} />
+
+      <h1 style={{ fontSize: 22, margin: "32px 0 20px" }}>Viewer invites</h1>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {visitorRows.map((inv) => (
+          <InviteRow
+            key={inv.code}
+            url={`${env.siteUrl}/invite/${inv.code}`}
+            used={Boolean(inv.usedAt)}
+          />
+        ))}
+        {visitorRows.length === 0 ? (
+          <p style={{ color: "var(--muted)" }}>No viewer invites yet.</p>
         ) : null}
       </div>
 

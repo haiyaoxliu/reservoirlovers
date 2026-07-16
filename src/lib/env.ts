@@ -37,10 +37,6 @@ export const env = {
     const v = process.env.ADMIN_ATHLETE_ID;
     return v ? Number(v) : null;
   },
-  /** Shared password for the view-only tier; unset disables it. */
-  get viewerPassword() {
-    return process.env.VIEWER_PASSWORD || null;
-  },
   /** WebAuthn Relying Party ID for admin passkeys — the site's registrable
    *  domain. Defaults to the SITE_URL host with a leading `www.` stripped so a
    *  single rpID covers both the apex and `www` origins; override with

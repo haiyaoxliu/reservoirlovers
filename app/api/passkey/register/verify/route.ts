@@ -3,13 +3,13 @@ import { verifyRegistrationResponse } from "@simplewebauthn/server";
 import { isoBase64URL } from "@simplewebauthn/server/helpers";
 import { env } from "@/lib/env";
 import { getSession } from "@/lib/session";
-import { getAdminUser, saveCredential } from "@/lib/passkey";
+import { getSessionUser, saveCredential } from "@/lib/passkey";
 
 export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
-  const admin = await getAdminUser();
-  if (!admin) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const user = await getSessionUser();
+  if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const session = await getSession();
   const expectedChallenge = session.webauthnChallenge;
@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
   const label =
     typeof body.label === "string" && body.label.trim() ? body.label.trim().slice(0, 60) : null;
   await saveCredential({
-    userId: admin.id,
+    userId: user.id,
     credentialId: credential.id,
     publicKey: isoBase64URL.fromBuffer(credential.publicKey),
     counter: credential.counter,
@@ -49,9 +49,9 @@ export async function POST(req: NextRequest) {
   });
 
   // Registration proves possession — count it as a fresh verification so the
-  // admin isn't immediately asked to authenticate right after enrolling.
+  // member isn't immediately asked to authenticate right after enrolling.
   session.webauthnChallenge = undefined;
-  session.adminPasskeyAt = Date.now();
+  session.passkeyAt = Date.now();
   await session.save();
   return NextResponse.json({ ok: true });
 }

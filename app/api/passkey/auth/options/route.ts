@@ -2,15 +2,15 @@ import { NextResponse } from "next/server";
 import { generateAuthenticationOptions } from "@simplewebauthn/server";
 import { env } from "@/lib/env";
 import { getSession } from "@/lib/session";
-import { credentialTransports, getAdminUser, listCredentials } from "@/lib/passkey";
+import { credentialTransports, getSessionUser, listCredentials } from "@/lib/passkey";
 
 export const runtime = "nodejs";
 
 export async function POST() {
-  const admin = await getAdminUser();
-  if (!admin) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const user = await getSessionUser();
+  if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  const creds = await listCredentials(admin.id);
+  const creds = await listCredentials(user.id);
   if (creds.length === 0) {
     return NextResponse.json({ error: "no passkey enrolled" }, { status: 400 });
   }

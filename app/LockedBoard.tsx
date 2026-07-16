@@ -2,12 +2,13 @@
 
 import type { TimelineEvent } from "@/lib/queries";
 import { Board } from "./Board";
-import { ConnectButton } from "./ConnectButton";
 import type { TimelineMember } from "./Timeline";
 
 /**
- * Viewer-tier teaser: the real Board rendered with fake demo data, blurred
- * and inert, under a translucent lock overlay that invites a Strava connect.
+ * Visitor-tier teaser: the real Board rendered with fake demo data, blurred and
+ * inert, under a translucent lock overlay. Visitors reached this via a view-only
+ * invite; the full timeline/map is member-only, so we point them at a member
+ * invite rather than a Strava connect that would dead-end without one.
  */
 export function LockedBoard({
   events,
@@ -46,11 +47,13 @@ export function LockedBoard({
           }}
         >
           <div style={{ fontSize: 44, lineHeight: 1, marginBottom: 10 }}>🔒</div>
-          <h2 style={{ margin: "0 0 6px", fontSize: 24 }}>Hidden</h2>
-          <p style={{ margin: "0 0 18px", color: "var(--muted)", fontSize: 14 }}>
-            Connect with Strava to view details
+          <h2 style={{ margin: "0 0 6px", fontSize: 24 }}>Members only</h2>
+          <p style={{ margin: "0 0 4px", color: "var(--muted)", fontSize: 14 }}>
+            The timeline & map are for club members.
           </p>
-          <ConnectButton />
+          <p style={{ margin: 0, color: "var(--muted)", fontSize: 14 }}>
+            Ask the club for a member invite to join.
+          </p>
         </div>
       </div>
     </div>

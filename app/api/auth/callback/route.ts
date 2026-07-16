@@ -6,7 +6,7 @@ import { users } from "@/db/schema";
 import { env } from "@/lib/env";
 import { encryptToken } from "@/lib/crypto";
 import { getSession } from "@/lib/session";
-import { consumeInvite, isInviteValid } from "@/lib/invite";
+import { consumeInvite, isInviteValid, occupyBoundInvite } from "@/lib/invite";
 import { exchangeCode } from "@/strava/client";
 
 export const runtime = "nodejs";
@@ -75,6 +75,11 @@ export async function GET(req: NextRequest) {
     .values(values)
     .onConflictDoUpdate({ target: users.stravaAthleteId, set: values })
     .returning();
+
+  // Reconnecting members skip the invite branch above (their row already
+  // exists), so make sure any invite locked to them is marked occupied — keeps
+  // the slot count honest and shows them as the holder in /admin.
+  await occupyBoundInvite(athleteId);
 
   const session = await getSession();
   session.athleteId = athleteId;

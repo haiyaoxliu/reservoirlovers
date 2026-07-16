@@ -1,18 +1,11 @@
 "use client";
 
 import { useMemo } from "react";
-import type { TimelineEvent } from "@/lib/queries";
+import type { LeaderboardBuckets } from "@/lib/queries";
 import { formatDuration } from "@/lib/queries";
 import type { TimelineMember } from "./Timeline";
 import { Avatar } from "./Avatar";
-import {
-  DetailOnly,
-  Distance,
-  DistanceUnit,
-  HeaderTabs,
-  RANGE_MS,
-  useSettings,
-} from "./Settings";
+import { DetailOnly, Distance, DistanceUnit, HeaderTabs, useSettings } from "./Settings";
 import { LeaderboardRow, MemberName } from "./LeaderboardRow";
 import canonicalJson from "@/loop/canonical-loop.json";
 
@@ -29,47 +22,42 @@ function fmtYmd(iso: string): string {
 }
 
 /**
- * The leaderboard, aggregated client-side from the raw events so the range
- * setting (past week / month / year / all time) applies instantly. Member
- * colours stay stable (assigned from the all-time server order) even when a
- * shorter range reshuffles the ranking.
+ * The leaderboard. Rankings are precomputed server-side per range (see
+ * getLeaderboardBuckets) so no raw event stream reaches the browser; switching
+ * range just picks a bucket, still instant. Member colours stay stable
+ * (assigned from the all-time server order) even when a shorter range reshuffles
+ * the ranking.
  */
 export function Leaderboard({
   members,
-  events,
+  buckets,
 }: {
   members: TimelineMember[];
-  events: TimelineEvent[];
+  buckets: LeaderboardBuckets;
 }) {
   const { range, setRange } = useSettings();
 
-  const rows = useMemo(() => {
-    const span = RANGE_MS[range];
-    const cutoff = span == null ? null : Date.now() - span;
-    const agg = new Map(
-      members.map((m) => [
-        m.userId,
-        { loops: 0, exact: 0, tolerance: 0, total: 0, fastest: null as number | null },
-      ]),
-    );
-    for (const e of events) {
-      if (cutoff != null && new Date(e.eventTime).getTime() < cutoff) continue;
-      const a = agg.get(e.userId);
-      if (!a) continue;
-      a.total += e.percent;
-      if (e.kind === "full") {
-        a.loops += 1;
-        if (e.percent >= 100) a.exact += e.percent;
-        else a.tolerance += e.percent;
-        if (e.durationSeconds != null && (a.fastest == null || e.durationSeconds < a.fastest)) {
-          a.fastest = e.durationSeconds;
-        }
-      }
-    }
-    return members
-      .map((m) => ({ m, ...agg.get(m.userId)! }))
-      .sort((a, b) => b.loops - a.loops || b.total - a.total);
-  }, [members, events, range]);
+  const colorByUser = useMemo(
+    () => new Map(members.map((m) => [m.userId, m.color])),
+    [members],
+  );
+
+  const rows = useMemo(
+    () =>
+      buckets[range].map((r) => ({
+        userId: r.userId,
+        color: colorByUser.get(r.userId) ?? "var(--muted)",
+        avatarUrl: r.avatarUrl,
+        displayName: r.displayName,
+        deauthorizedAt: r.deauthorizedAt,
+        loops: r.loops,
+        exact: r.exactFullPercent,
+        tolerance: r.toleranceFullPercent,
+        total: r.totalPercent,
+        fastest: r.fastestSeconds,
+      })),
+    [buckets, range, colorByUser],
+  );
 
   // Bars scale to the largest total score in the selected range.
   const maxTotal = Math.max(0, ...rows.map((r) => r.total));
@@ -130,30 +118,30 @@ export function Leaderboard({
             </DetailOnly>
           </h2>
         </DetailOnly>
-        {rows.map(({ m, loops, exact, tolerance, total, fastest }, i) => (
+        {rows.map((r, i) => (
           <LeaderboardRow
             // Range in the key remounts rows on timeframe switch so no
             // stale marks or name-fit state carries over.
-            key={`${range}:${m.userId}`}
-            color={m.color}
+            key={`${range}:${r.userId}`}
+            color={r.color}
             maxTotal={maxTotal}
-            exactFullPercent={exact}
-            toleranceFullPercent={tolerance}
-            totalPercent={total}
-            loops={loops}
+            exactFullPercent={r.exact}
+            toleranceFullPercent={r.tolerance}
+            totalPercent={r.total}
+            loops={r.loops}
           >
             <DetailOnly pref="rowChrome">
               <span style={{ width: 18, color: "var(--muted)", fontVariantNumeric: "tabular-nums" }}>
                 {i + 1}
               </span>
-              <Avatar url={m.avatarUrl} name={m.displayName} color={m.color} />
+              <Avatar url={r.avatarUrl} name={r.displayName} color={r.color} />
             </DetailOnly>
-            <MemberName name={m.displayName} dimmed={Boolean(m.deauthorizedAt)} />
+            <MemberName name={r.displayName} dimmed={Boolean(r.deauthorizedAt)} />
             {/* Disconnected members keep their history but are frozen: greyed
                 name plus the date their Strava was unlinked. */}
-            {m.deauthorizedAt ? (
+            {r.deauthorizedAt ? (
               <span
-                title={`Strava disconnected — last update ${fmtYmd(m.deauthorizedAt)}`}
+                title={`Strava disconnected — last update ${fmtYmd(r.deauthorizedAt)}`}
                 style={{
                   flexShrink: 0,
                   fontSize: 11,
@@ -161,7 +149,7 @@ export function Leaderboard({
                   fontVariantNumeric: "tabular-nums",
                 }}
               >
-                {fmtYmd(m.deauthorizedAt)}
+                {fmtYmd(r.deauthorizedAt)}
               </span>
             ) : null}
             {/* Fixed-width right-aligned columns so PR / km / loops line up
@@ -177,7 +165,7 @@ export function Leaderboard({
                     fontVariantNumeric: "tabular-nums",
                   }}
                 >
-                  {formatDuration(fastest) ?? ""}
+                  {formatDuration(r.fastest) ?? ""}
                 </span>
                 <span
                   style={{
@@ -188,7 +176,7 @@ export function Leaderboard({
                     fontVariantNumeric: "tabular-nums",
                   }}
                 >
-                  {total > 0 ? <Distance km={kmOf(total)} bare /> : ""}
+                  {r.total > 0 ? <Distance km={kmOf(r.total)} bare /> : ""}
                 </span>
                 <span
                   style={{
@@ -199,7 +187,7 @@ export function Leaderboard({
                     fontWeight: 700,
                   }}
                 >
-                  {loops}
+                  {r.loops}
                 </span>
               </div>
             </DetailOnly>

@@ -214,6 +214,26 @@ function KeyIcon({ size = 16 }: { size?: number }) {
   );
 }
 
+/** Person glyph for the member account page. */
+function UserIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </svg>
+  );
+}
+
 /** Sliders glyph for the detail-visibility controls. */
 function SlidersIcon({ size = 16 }: { size?: number }) {
   return (
@@ -465,9 +485,16 @@ const DETAIL_TOGGLES: { key: keyof DetailPrefs; label: string }[] = [
   { key: "userHighlight", label: "User highlight" },
 ];
 
-/** Header buttons: admin invites (admins only), settings, and sign-out. The
- *  detail-visibility button is hidden for now; its modal code remains. */
-export function HeaderActions({ isAdmin = false }: { isAdmin?: boolean }) {
+/** Header buttons: admin invites (admins), or the account page (other members);
+ *  settings; and sign-out. The detail-visibility button is hidden for now; its
+ *  modal code remains. Viewers get neither the key nor the account icon. */
+export function HeaderActions({
+  isMember = false,
+  isAdmin = false,
+}: {
+  isMember?: boolean;
+  isAdmin?: boolean;
+}) {
   const [openSettings, setOpenSettings] = useState(false);
   const [openDetail, setOpenDetail] = useState(false);
   const { units, theme, prefs, setUnits, setTheme, setPref } = useSettings();
@@ -477,6 +504,10 @@ export function HeaderActions({ isAdmin = false }: { isAdmin?: boolean }) {
       {isAdmin ? (
         <a aria-label="Invites" title="Invites" href="/admin" style={iconButtonStyle}>
           <KeyIcon />
+        </a>
+      ) : isMember ? (
+        <a aria-label="Account" title="Account" href="/account" style={iconButtonStyle}>
+          <UserIcon />
         </a>
       ) : null}
       {false ? (
