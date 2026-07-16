@@ -13,6 +13,24 @@ export interface SessionData {
   /** Hash prefix of the password the viewer logged in with — rotating
    *  VIEWER_PASSWORD invalidates existing viewer sessions. */
   viewerKey?: string;
+  /** In-flight WebAuthn challenge (base64url) for an admin passkey ceremony. */
+  webauthnChallenge?: string;
+  /** Epoch ms of the admin's last successful passkey verification. The admin
+   *  page and its actions require this to be recent (see isFreshPasskey). */
+  adminPasskeyAt?: number;
+}
+
+/** How long an admin passkey verification stays valid before /admin re-prompts.
+ *  Short by design — the admin re-verifies on each visit; the window only needs
+ *  to cover using the page in one sitting. */
+export const ADMIN_PASSKEY_TTL_MS = 5 * 60_000;
+
+/** True if this session presented a passkey within the freshness window. */
+export function isFreshPasskey(session: SessionData): boolean {
+  return (
+    typeof session.adminPasskeyAt === "number" &&
+    Date.now() - session.adminPasskeyAt < ADMIN_PASSKEY_TTL_MS
+  );
 }
 
 /** Key stored in viewer sessions; compared against the current password. */

@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/db/index";
 import { invites, users } from "@/db/schema";
 import { env } from "@/lib/env";
-import { getSession } from "@/lib/session";
+import { getSession, isFreshPasskey } from "@/lib/session";
+import { listCredentials } from "@/lib/passkey";
 import { MAX_SLOTS, countCommittedSlots, createInvite, releaseInvite } from "@/lib/invite";
 import { reconcileAll, reconcileOne, type ReconcileResult } from "@/worker/reconcile";
 import { RateLimitError, deauthorize } from "@/strava/client";
@@ -13,6 +14,8 @@ import { ExternalLinkIcon } from "../ExternalLinkIcon";
 import { CopyButton } from "../CopyButton";
 import { AdminTools } from "./AdminTools";
 import { NewInvite } from "./NewInvite";
+import { PasskeyGate } from "./PasskeyGate";
+import { PasskeyEnroll } from "./PasskeyEnroll";
 
 export const dynamic = "force-dynamic";
 // Server actions on this page (refresh/backfill) call the Strava API in a
@@ -29,9 +32,21 @@ async function requireAdmin() {
   return user;
 }
 
+/** Server-action guard: Strava-admin AND a recent passkey verification. The UI
+ *  only surfaces these actions once verified, so a failure here means a direct
+ *  POST without a fresh passkey — reject it. */
+async function requireVerifiedAdmin() {
+  const user = await requireAdmin();
+  const session = await getSession();
+  if (!isFreshPasskey(session)) {
+    throw new Error("Admin passkey verification required.");
+  }
+  return user;
+}
+
 async function createInviteAction(): Promise<string | null> {
   "use server";
-  const admin = await requireAdmin();
+  const admin = await requireVerifiedAdmin();
   const code = await createInvite(admin.id);
   if (!code) {
     return `At the ${MAX_SLOTS}-athlete cap — remove a member or use an open invite before creating another.`;
@@ -62,7 +77,7 @@ const actionDeadline = () => Date.now() + 45_000;
 
 async function refreshAllAction(): Promise<string> {
   "use server";
-  await requireAdmin();
+  await requireVerifiedAdmin();
   try {
     const result = await reconcileAll({
       refreshProfiles: true,
@@ -79,7 +94,7 @@ async function refreshAllAction(): Promise<string> {
 
 async function backfillAllAction(): Promise<string> {
   "use server";
-  await requireAdmin();
+  await requireVerifiedAdmin();
   try {
     const result = await reconcileAll({ maxPages: 100, deadlineMs: actionDeadline() });
     return summarize(result, false);
@@ -91,7 +106,7 @@ async function backfillAllAction(): Promise<string> {
 
 async function backfillUserAction(athleteId: number): Promise<string> {
   "use server";
-  await requireAdmin();
+  await requireVerifiedAdmin();
   const user = await db.query.users.findFirst({
     where: eq(users.stravaAthleteId, athleteId),
   });
@@ -118,7 +133,7 @@ async function backfillUserAction(athleteId: number): Promise<string> {
  *  shows the disconnect date. */
 async function removeMemberAction(athleteId: number): Promise<string> {
   "use server";
-  await requireAdmin();
+  await requireVerifiedAdmin();
   const user = await db.query.users.findFirst({
     where: eq(users.stravaAthleteId, athleteId),
   });
@@ -156,7 +171,20 @@ async function removeMemberAction(athleteId: number): Promise<string> {
 }
 
 export default async function AdminPage() {
-  await requireAdmin();
+  const admin = await requireAdmin();
+
+  // Passkey second factor. No passkey yet → bootstrap enrollment (Strava-admin
+  // session is the trust anchor). Passkey exists but not recently verified →
+  // gate; no admin data is fetched or sent to the browser until it passes.
+  const credentials = await listCredentials(admin.id);
+  const session = await getSession();
+  if (credentials.length === 0) {
+    return <PasskeyEnroll bootstrap />;
+  }
+  if (!isFreshPasskey(session)) {
+    return <PasskeyGate />;
+  }
+
   const members = await db
     .select({ athleteId: users.stravaAthleteId, name: users.displayName })
     .from(users)
@@ -333,6 +361,37 @@ export default async function AdminPage() {
           <p style={{ color: "var(--muted)" }}>No invites yet.</p>
         ) : null}
       </div>
+
+      <h1 style={{ fontSize: 22, margin: "32px 0 8px" }}>Passkeys</h1>
+      <p style={{ color: "var(--muted)", fontSize: 13, margin: "0 0 16px" }}>
+        Required to open this page. Register a spare on another device so a lost
+        one doesn&apos;t lock you out.
+      </p>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 16 }}>
+        {credentials.map((c) => (
+          <div
+            key={c.id}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              background: "var(--panel)",
+              border: "1px solid var(--border)",
+              borderRadius: 8,
+              padding: "8px 12px",
+              fontSize: 13,
+            }}
+          >
+            <span style={{ flex: 1, minWidth: 0 }}>{c.label ?? "Passkey"}</span>
+            <span style={{ color: "var(--muted)", fontSize: 12, flexShrink: 0 }}>
+              {c.lastUsedAt
+                ? `last used ${c.lastUsedAt.toISOString().slice(0, 10)}`
+                : `added ${c.createdAt.toISOString().slice(0, 10)}`}
+            </span>
+          </div>
+        ))}
+      </div>
+      <PasskeyEnroll />
     </div>
   );
 }

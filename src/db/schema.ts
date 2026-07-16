@@ -120,7 +120,27 @@ export const invites = pgTable("invites", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/** WebAuthn passkeys that gate the admin site (second factor on top of the
+ *  Strava-admin session). One row per registered authenticator. */
+export const adminCredentials = pgTable("admin_credentials", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  userId: bigint("user_id", { mode: "number" })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  // base64url-encoded credential id (WebAuthn credential.id).
+  credentialId: text("credential_id").notNull().unique(),
+  // base64url-encoded COSE public key bytes.
+  publicKey: text("public_key").notNull(),
+  counter: bigint("counter", { mode: "number" }).notNull().default(0),
+  // JSON array of AuthenticatorTransport values, as returned by the browser.
+  transports: text("transports"),
+  label: text("label"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+});
+
 export type User = typeof users.$inferSelect;
 export type Activity = typeof activities.$inferSelect;
 export type LoopEventRow = typeof loopEvents.$inferSelect;
 export type Invite = typeof invites.$inferSelect;
+export type AdminCredential = typeof adminCredentials.$inferSelect;
