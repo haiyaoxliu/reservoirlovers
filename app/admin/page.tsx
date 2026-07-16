@@ -174,6 +174,11 @@ export default async function AdminPage() {
     .leftJoin(users, eq(users.stravaAthleteId, invites.usedByAthleteId))
     .orderBy(desc(invites.createdAt))
     .limit(50);
+  // Members who connected without redeeming an invite (e.g. the admin who set
+  // the app up). They still occupy a Strava slot, so surface them alongside the
+  // invite links — otherwise the list undercounts the real committed total.
+  const redeemed = new Set(rows.filter((r) => r.usedByAthleteId).map((r) => r.usedByAthleteId));
+  const directSlots = members.filter((m) => !redeemed.has(m.athleteId));
 
   return (
     <div className="container">
@@ -213,6 +218,53 @@ export default async function AdminPage() {
       />
 
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {directSlots.map((m) => (
+          <div
+            key={`direct-${m.athleteId}`}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              background: "var(--panel)",
+              border: "1px solid var(--border)",
+              borderRadius: 8,
+              padding: "8px 12px",
+              opacity: 0.6,
+            }}
+          >
+            <span
+              style={{
+                fontSize: 13,
+                flex: 1,
+                minWidth: 0,
+                color: "var(--muted)",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              Connected directly — no invite link
+            </span>
+            <a
+              href={`https://www.strava.com/athletes/${m.athleteId}`}
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 5,
+                color: "var(--text)",
+                fontSize: 13,
+                whiteSpace: "nowrap",
+                flexShrink: 0,
+              }}
+            >
+              {m.name}
+              <ExternalLinkIcon size={11} />
+            </a>
+            <span style={{ fontSize: 12, color: "#ff6b6b", flexShrink: 0 }}>used</span>
+          </div>
+        ))}
         {rows.map((inv) => {
           const url = `${env.siteUrl}/invite/${inv.code}`;
           const used = Boolean(inv.usedByAthleteId);
@@ -277,7 +329,9 @@ export default async function AdminPage() {
             </div>
           );
         })}
-        {rows.length === 0 ? <p style={{ color: "var(--muted)" }}>No invites yet.</p> : null}
+        {rows.length === 0 && directSlots.length === 0 ? (
+          <p style={{ color: "var(--muted)" }}>No invites yet.</p>
+        ) : null}
       </div>
     </div>
   );
