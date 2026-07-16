@@ -5,13 +5,14 @@ import { db } from "@/db/index";
 import { invites, users } from "@/db/schema";
 import { env } from "@/lib/env";
 import { getSession } from "@/lib/session";
-import { createInvite, releaseInvite } from "@/lib/invite";
+import { MAX_SLOTS, countCommittedSlots, createInvite, releaseInvite } from "@/lib/invite";
 import { reconcileAll, reconcileOne, type ReconcileResult } from "@/worker/reconcile";
 import { RateLimitError, deauthorize } from "@/strava/client";
 import { getValidAccessToken } from "@/strava/tokens";
 import { ExternalLinkIcon } from "../ExternalLinkIcon";
 import { CopyButton } from "../CopyButton";
 import { AdminTools } from "./AdminTools";
+import { NewInvite } from "./NewInvite";
 
 export const dynamic = "force-dynamic";
 // Server actions on this page (refresh/backfill) call the Strava API in a
@@ -28,11 +29,15 @@ async function requireAdmin() {
   return user;
 }
 
-async function createInviteAction() {
+async function createInviteAction(): Promise<string | null> {
   "use server";
   const admin = await requireAdmin();
-  await createInvite(admin.id);
+  const code = await createInvite(admin.id);
+  if (!code) {
+    return `At the ${MAX_SLOTS}-athlete cap — remove a member or use an open invite before creating another.`;
+  }
   revalidatePath("/admin");
+  return null;
 }
 
 function summarize(r: ReconcileResult, withProfiles: boolean): string {
@@ -157,6 +162,7 @@ export default async function AdminPage() {
     .from(users)
     .where(isNull(users.deauthorizedAt))
     .orderBy(users.displayName);
+  const committedSlots = await countCommittedSlots();
   // Attach the Strava account that redeemed each invite.
   const rows = await db
     .select({
@@ -200,22 +206,11 @@ export default async function AdminPage() {
 
       <h1 style={{ fontSize: 22, margin: "8px 0 20px" }}>Invites</h1>
 
-      <form action={createInviteAction} style={{ marginBottom: 24 }}>
-        <button
-          type="submit"
-          style={{
-            background: "var(--accent)",
-            color: "#04121f",
-            fontWeight: 600,
-            border: "none",
-            borderRadius: 8,
-            padding: "8px 16px",
-            cursor: "pointer",
-          }}
-        >
-          New invite
-        </button>
-      </form>
+      <NewInvite
+        committedSlots={committedSlots}
+        maxSlots={MAX_SLOTS}
+        create={createInviteAction}
+      />
 
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         {rows.map((inv) => {

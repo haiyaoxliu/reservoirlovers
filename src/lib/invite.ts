@@ -1,7 +1,11 @@
 import { randomBytes } from "node:crypto";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, count, eq, gt, isNull, or } from "drizzle-orm";
 import { db } from "../db/index";
-import { invites } from "../db/schema";
+import { invites, users } from "../db/schema";
+
+/** Strava caps the app at 10 connected athletes. We never let members plus
+ *  still-open invites exceed this — an open invite is a slot already promised. */
+export const MAX_SLOTS = 10;
 
 export function generateInviteCode(): string {
   // 8 url-safe chars, human-shareable.
@@ -31,7 +35,30 @@ export async function consumeInvite(code: string, athleteId: number): Promise<bo
   return res.length > 0;
 }
 
-export async function createInvite(createdBy: number): Promise<string> {
+/** Slots already committed against the Strava 10-athlete cap: connected members
+ *  plus still-open (unused, unexpired) invites, each of which could become a
+ *  member. */
+export async function countCommittedSlots(): Promise<number> {
+  const [members] = await db
+    .select({ n: count() })
+    .from(users)
+    .where(isNull(users.deauthorizedAt));
+  const [open] = await db
+    .select({ n: count() })
+    .from(invites)
+    .where(
+      and(
+        isNull(invites.usedByAthleteId),
+        or(isNull(invites.expiresAt), gt(invites.expiresAt, new Date())),
+      ),
+    );
+  return members.n + open.n;
+}
+
+/** Create an invite unless doing so would exceed the Strava cap. Returns the
+ *  new code, or null if we're already at capacity. */
+export async function createInvite(createdBy: number): Promise<string | null> {
+  if ((await countCommittedSlots()) >= MAX_SLOTS) return null;
   const code = generateInviteCode();
   await db.insert(invites).values({ code, createdBy });
   return code;
