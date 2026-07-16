@@ -15,6 +15,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx --env-file-if-exists=.env.local scripts/migrate.ts",
     "backfill": "tsx --env-file-if-exists=.env.local scripts/backfill.ts",
+    "invites:release": "tsx --env-file-if-exists=.env.local scripts/release-orphan-invites.ts",
     "webhook:subscribe": "tsx --env-file-if-exists=.env.local scripts/webhook-subscribe.ts"
   },
   "dependencies": {

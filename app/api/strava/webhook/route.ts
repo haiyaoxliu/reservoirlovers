@@ -5,6 +5,7 @@ import { db } from "@/db/index";
 import { users, webhookEvents } from "@/db/schema";
 import { env } from "@/lib/env";
 import { processActivity } from "@/worker/process-activity";
+import { releaseInvite } from "@/lib/invite";
 
 export const runtime = "nodejs";
 
@@ -62,11 +63,12 @@ export async function POST(req: NextRequest) {
 async function handleEvent(payload: WebhookPayload, rowId: number): Promise<void> {
   try {
     if (payload.object_type === "athlete" && payload.updates?.authorized === "false") {
-      // Deauthorization: drop tokens, keep history.
+      // Deauthorization: drop tokens, keep history, reopen their invite.
       await db
         .update(users)
         .set({ accessToken: null, refreshToken: null, tokenExpiresAt: null, deauthorizedAt: new Date() })
         .where(eq(users.stravaAthleteId, payload.owner_id));
+      await releaseInvite(payload.owner_id);
     } else if (payload.object_type === "activity") {
       await processActivity(payload.object_id, payload.owner_id, payload.aspect_type);
     }

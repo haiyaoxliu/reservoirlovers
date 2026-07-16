@@ -36,3 +36,15 @@ export async function createInvite(createdBy: number): Promise<string> {
   await db.insert(invites).values({ code, createdBy });
   return code;
 }
+
+/** Free every invite this athlete redeemed so the link opens back up for reuse.
+ *  Called when a member is removed/deauthorized. Idempotent, and returns the
+ *  freed codes (usually one). */
+export async function releaseInvite(athleteId: number): Promise<string[]> {
+  const freed = await db
+    .update(invites)
+    .set({ usedByAthleteId: null, usedAt: null })
+    .where(eq(invites.usedByAthleteId, athleteId))
+    .returning({ code: invites.code });
+  return freed.map((r) => r.code);
+}

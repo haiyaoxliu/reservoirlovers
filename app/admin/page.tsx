@@ -5,7 +5,7 @@ import { db } from "@/db/index";
 import { invites, users } from "@/db/schema";
 import { env } from "@/lib/env";
 import { getSession } from "@/lib/session";
-import { createInvite } from "@/lib/invite";
+import { createInvite, releaseInvite } from "@/lib/invite";
 import { reconcileAll, reconcileOne, type ReconcileResult } from "@/worker/reconcile";
 import { RateLimitError, deauthorize } from "@/strava/client";
 import { getValidAccessToken } from "@/strava/tokens";
@@ -107,7 +107,8 @@ async function backfillUserAction(athleteId: number): Promise<string> {
 }
 
 /** Disconnect a member: revoke on Strava (freeing a slot against the
- *  10-athlete cap), drop the stored tokens, and mark them deauthorized. Their
+ *  10-athlete cap), drop the stored tokens, mark them deauthorized, and free
+ *  the invite they redeemed so it can be handed to someone new. Their
  *  activities and loop history stay put — the leaderboard greys the row and
  *  shows the disconnect date. */
 async function removeMemberAction(athleteId: number): Promise<string> {
@@ -140,11 +141,13 @@ async function removeMemberAction(athleteId: number): Promise<string> {
       deauthorizedAt: new Date(),
     })
     .where(eq(users.id, user.id));
+  // Reopen the invite they used so it can be reshared for the freed slot.
+  await releaseInvite(athleteId);
   revalidatePath("/admin");
   revalidatePath("/");
   return revokeConfirmed
-    ? `${user.displayName} disconnected — a Strava slot is freed and their history stays on the board.`
-    : `${user.displayName} marked disconnected, but Strava didn't confirm the revoke. If the slot isn't freed, they may need to remove the app from their Strava settings.`;
+    ? `${user.displayName} disconnected — a Strava slot is freed, their invite reopens, and their history stays on the board.`
+    : `${user.displayName} marked disconnected and their invite reopened, but Strava didn't confirm the revoke. If the slot isn't freed, they may need to remove the app from their Strava settings.`;
 }
 
 export default async function AdminPage() {
