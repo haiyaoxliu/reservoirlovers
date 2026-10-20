@@ -486,8 +486,14 @@ export function Board({
                     {/* No name here — the map header already shows whose runs
                         these are. The stat links to the Strava activity,
                         coloured by tier like the rest of the site. */}
+                    {/* Negative Strava ids are manual-override laps entered by
+                        hand (no Strava activity): no link, labelled instead. */}
                     <a
-                      href={`https://www.strava.com/activities/${selected.stravaActivityId}`}
+                      href={
+                        selected.stravaActivityId < 0
+                          ? undefined
+                          : `https://www.strava.com/activities/${selected.stravaActivityId}`
+                      }
                       target="_blank"
                       rel="noreferrer"
                       style={{
@@ -511,7 +517,13 @@ export function Board({
                         .join(" · ")}
                       {" · "}
                       <Distance km={((selected.percent / 100) * loop.totalMeters) / 1000} />
-                      <ExternalLinkIcon size={11} />
+                      {selected.stravaActivityId < 0 ? (
+                        <span style={{ color: "var(--muted)", fontWeight: 400, fontSize: 12 }}>
+                          · manual override
+                        </span>
+                      ) : (
+                        <ExternalLinkIcon size={11} />
+                      )}
                     </a>
                   </div>
                   {prefs.detailMeta ? (
